@@ -88,6 +88,8 @@ export default function Home() {
     },
     onConnect: () => {
       console.log("Connected");
+      console.log("🔧 Client tools registered:", Object.keys({ updateRubricNotes }));
+      console.log("🔧 updateRubricNotes function:", typeof updateRubricNotes);
     },
     onDisconnect: () => {
       console.log("Disconnected");
@@ -110,6 +112,16 @@ export default function Home() {
       console.error("Conversation error:", error);
       setError(typeof error === 'string' ? error : "An error occurred");
       setTimeout(() => setError(null), 5000);
+    },
+    onUnhandledClientToolCall: (toolCall) => {
+      console.error('❌ UNHANDLED CLIENT TOOL CALL:', toolCall);
+      console.error('Tool name:', toolCall);
+    },
+    onAgentToolResponse: (response) => {
+      console.log('✅ Agent tool response received:', response);
+    },
+    onDebug: (debugInfo) => {
+      console.log('🐛 Debug info:', debugInfo);
     },
   });
 
