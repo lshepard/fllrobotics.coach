@@ -133,6 +133,10 @@ export default function Home() {
     ? (conversation.isSpeaking ? "speaking" : "listening")
     : undefined;
 
+  // Get audio stream from conversation for visualizer
+  // @ts-expect-error - Type incompatibility with @elevenlabs/react
+  const audioStream = conversation.audioStream || null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section with Background */}
@@ -187,6 +191,10 @@ export default function Home() {
                   <BarVisualizer
                     state={agentState}
                     barCount={20}
+                    mediaStream={audioStream}
+                    demo={true}
+                    minHeight={10}
+                    maxHeight={95}
                     className="w-full h-48 bg-gray-100 border-2 border-[#0066B3]/20"
                   />
                 </div>
