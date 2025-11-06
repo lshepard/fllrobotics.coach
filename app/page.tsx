@@ -156,171 +156,69 @@ export default function Home() {
 
   // Effect to capture agent's audio output
   useEffect(() => {
-    console.log('🔍 Audio capture effect running. isConnected:', isConnected);
-
-    if (!isConnected) {
-      console.log('❌ Not connected, skipping audio capture');
-      return;
-    }
+    if (!isConnected) return;
 
     let captureAttempted = false;
 
-    // Try to find the audio element created by ElevenLabs
-    const findAndCaptureAudio = async (audio: HTMLAudioElement) => {
-      // Skip if already captured this element
-      if (audio === audioElementRef.current) {
-        console.log('⏭️ Audio element already captured, skipping');
-        return;
-      }
+    const captureAudioStream = async (audio: HTMLAudioElement) => {
+      if (audio === audioElementRef.current || captureAttempted) return;
+      if (!audio.src && !audio.srcObject) return;
 
-      if (captureAttempted) {
-        console.log('⏭️ Capture already attempted, skipping');
-        return;
-      }
+      try {
+        captureAttempted = true;
 
-      console.log('🎵 Attempting to capture audio element:', {
-        src: audio.src,
-        srcObject: audio.srcObject,
-        paused: audio.paused,
-        currentTime: audio.currentTime,
-        volume: audio.volume
-      });
-
-      // Check if this audio element is actively playing or has a source
-      if (audio.src || audio.srcObject) {
-          try {
-            captureAttempted = true;
-            // Create audio context if it doesn't exist
-            if (!audioContextRef.current) {
-              const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-              audioContextRef.current = new AudioContextClass();
-              console.log('✅ Created AudioContext, state:', audioContextRef.current.state);
-            }
-
-            // Resume audio context if suspended
-            if (audioContextRef.current.state === 'suspended') {
-              await audioContextRef.current.resume();
-              console.log('✅ Resumed AudioContext');
-            }
-
-            // Try to use the audio element's srcObject directly if it's a MediaStream
-            if (audio.srcObject && audio.srcObject instanceof MediaStream) {
-              console.log('✅ Audio element has MediaStream srcObject, using it directly');
-              agentMediaStreamRef.current = audio.srcObject;
-              forceUpdate({});
-              console.log('✅ Set agentMediaStream from srcObject:', audio.srcObject);
-            } else {
-              // Fallback: create from audio element
-              console.log('⚠️ Audio element does not have MediaStream srcObject, creating from element');
-
-              // Create a media stream destination
-              const destination = audioContextRef.current.createMediaStreamDestination();
-              console.log('✅ Created MediaStreamDestination');
-
-              // Create source from audio element
-              const source = audioContextRef.current.createMediaElementSource(audio);
-              console.log('✅ Created MediaElementSource');
-
-              // Connect to both destination (for capture) and context destination (for playback)
-              source.connect(destination);
-              source.connect(audioContextRef.current.destination);
-              console.log('✅ Connected audio nodes');
-
-              agentMediaStreamRef.current = destination.stream;
-              forceUpdate({});
-              console.log('✅ Set agentMediaStream from destination:', destination.stream);
-            }
-
-            // Store the audio element
-            audioElementRef.current = audio;
-
-            console.log('✅ Final agentMediaStream:', agentMediaStreamRef.current);
-            console.log('  📊 Stream tracks:', agentMediaStreamRef.current?.getTracks().map(t => ({
-              kind: t.kind,
-              enabled: t.enabled,
-              muted: t.muted,
-              readyState: t.readyState,
-              label: t.label
-            })));
-            console.log('  🔊 Audio element:', {
-              volume: audio.volume,
-              muted: audio.muted,
-              paused: audio.paused,
-              readyState: audio.readyState,
-              duration: audio.duration
-            });
-
-            // Test audio levels from the final stream
-            if (agentMediaStreamRef.current) {
-              const testAnalyserContext = new AudioContext();
-              const testSource = testAnalyserContext.createMediaStreamSource(agentMediaStreamRef.current);
-              const testAnalyser = testAnalyserContext.createAnalyser();
-              testSource.connect(testAnalyser);
-              const dataArray = new Uint8Array(testAnalyser.frequencyBinCount);
-              const checkAudio = () => {
-                testAnalyser.getByteFrequencyData(dataArray);
-                const sum = dataArray.reduce((a, b) => a + b, 0);
-                const avg = sum / dataArray.length;
-                console.log('  🎚️ Audio level check:', avg.toFixed(2), 'active:', avg > 0);
-                if (avg > 0) {
-                  console.log('  ✅ AUDIO DATA IS FLOWING IN AGENT STREAM!');
-                  testAnalyserContext.close();
-                } else {
-                  console.log('  ⚠️ No audio data detected in agent stream');
-                  setTimeout(checkAudio, 500);
-                }
-              };
-              setTimeout(checkAudio, 100);
-            }
-
-            return;
-          } catch (err) {
-            console.warn('❌ Failed to capture audio element:', err);
-          }
+        // If audio element has a MediaStream srcObject, use it directly
+        if (audio.srcObject && audio.srcObject instanceof MediaStream) {
+          agentMediaStreamRef.current = audio.srcObject;
+          audioElementRef.current = audio;
+          forceUpdate({});
+          return;
         }
-      };
 
-    // Listen for audio elements starting to play
+        // Fallback: route through Web Audio API
+        if (!audioContextRef.current) {
+          const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          audioContextRef.current = new AudioContextClass();
+        }
+
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+
+        const destination = audioContextRef.current.createMediaStreamDestination();
+        const source = audioContextRef.current.createMediaElementSource(audio);
+        source.connect(destination);
+        source.connect(audioContextRef.current.destination);
+
+        agentMediaStreamRef.current = destination.stream;
+        audioElementRef.current = audio;
+        forceUpdate({});
+      } catch (err) {
+        console.error('Failed to capture audio:', err);
+      }
+    };
+
     const handlePlay = (event: Event) => {
-      const audio = event.target as HTMLAudioElement;
-      console.log('▶️ Audio element started playing!', audio);
-      findAndCaptureAudio(audio);
+      captureAudioStream(event.target as HTMLAudioElement);
     };
 
-    // Find existing audio elements and add listeners
-    const setupAudioListeners = () => {
-      const audioElements = document.querySelectorAll('audio');
-      console.log('🔊 Found', audioElements.length, 'audio elements in DOM');
-
-      audioElements.forEach(audio => {
-        // Try to capture immediately if it's already playing
+    const setupListeners = () => {
+      document.querySelectorAll('audio').forEach(audio => {
         if (!audio.paused && audio.currentTime > 0) {
-          console.log('🎵 Found already-playing audio element');
-          findAndCaptureAudio(audio);
+          captureAudioStream(audio);
         }
-
-        // Listen for play events
         audio.addEventListener('play', handlePlay);
-        console.log('👂 Added play listener to audio element');
       });
     };
 
-    // Set up listeners immediately
-    setupAudioListeners();
+    setupListeners();
 
-    // Also watch for new audio elements being added
     const observer = new MutationObserver(() => {
-      if (!captureAttempted) {
-        setupAudioListeners();
-      }
+      if (!captureAttempted) setupListeners();
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    // Cleanup
     return () => {
       observer.disconnect();
       document.querySelectorAll('audio').forEach(audio => {
@@ -333,67 +231,6 @@ export default function Home() {
   const visualizerStream = conversation.status === "connected"
     ? (conversation.isSpeaking ? agentMediaStreamRef.current : userMediaStream)
     : null;
-
-  // Debug visualizer stream selection and test its audio levels
-  useEffect(() => {
-    console.log('📊 Visualizer stream selection:', {
-      conversationStatus: conversation.status,
-      isSpeaking: conversation.isSpeaking,
-      agentState,
-      hasAgentMediaStream: !!agentMediaStreamRef.current,
-      hasUserMediaStream: !!userMediaStream,
-      selectedStream: conversation.isSpeaking ? 'agentMediaStream' : 'userMediaStream',
-      visualizerStream: visualizerStream,
-      visualizerStreamId: visualizerStream?.id,
-      agentStreamId: agentMediaStreamRef.current?.id,
-      userStreamId: userMediaStream?.id
-    });
-
-    if (visualizerStream) {
-      const tracks = visualizerStream.getTracks();
-      console.log('  🎬 Visualizer stream tracks:', tracks.map(t => ({
-        kind: t.kind,
-        enabled: t.enabled,
-        muted: t.muted,
-        readyState: t.readyState
-      })));
-
-      // TEST THE VISUALIZER STREAM DIRECTLY
-      try {
-        const testContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        const streamSource = testContext.createMediaStreamSource(visualizerStream);
-        const streamAnalyser = testContext.createAnalyser();
-        streamAnalyser.fftSize = 256;
-        streamSource.connect(streamAnalyser);
-
-        const streamDataArray = new Uint8Array(streamAnalyser.frequencyBinCount);
-        let checkCount = 0;
-        const maxChecks = 10;
-
-        const checkVisualizerStream = () => {
-          streamAnalyser.getByteFrequencyData(streamDataArray);
-          const sum = streamDataArray.reduce((a, b) => a + b, 0);
-          const avg = sum / streamDataArray.length;
-          console.log(`  🔍 VISUALIZER STREAM AUDIO CHECK #${checkCount + 1}:`, avg.toFixed(2), 'active:', avg > 0);
-
-          checkCount++;
-          if (avg > 0) {
-            console.log('  ✅✅✅ VISUALIZER STREAM HAS AUDIO DATA! ✅✅✅');
-            testContext.close();
-          } else if (checkCount < maxChecks) {
-            setTimeout(checkVisualizerStream, 200);
-          } else {
-            console.log('  ❌ VISUALIZER STREAM: No audio detected after', maxChecks, 'checks');
-            testContext.close();
-          }
-        };
-
-        setTimeout(checkVisualizerStream, 100);
-      } catch (err) {
-        console.error('  ❌ Failed to analyze visualizer stream:', err);
-      }
-    }
-  }, [conversation.status, conversation.isSpeaking, agentState, userMediaStream, visualizerStream]);
 
   return (
     <div className="min-h-screen bg-gray-50">
