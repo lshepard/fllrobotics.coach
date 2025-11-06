@@ -11,54 +11,6 @@ import { Message, MessageContent } from "@/components/ui/message";
 
 const AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
 
-const rubricData = [
-  {
-    category: "IDENTIFY",
-    description:
-      "Team had a clearly defined problem that was well researched.",
-    elements: [
-      "Clear definition of the problem",
-      "Clear, detailed research from a variety of sources",
-    ],
-  },
-  {
-    category: "DESIGN",
-    description:
-      "Team worked together while creating a project plan and developing their ideas.",
-    elements: [
-      "Clear evidence of an effective project plan",
-      "Clear evidence that development process involved all team members",
-    ],
-  },
-  {
-    category: "CREATE",
-    description:
-      "Team developed an original idea or built on an existing one with a prototype model/drawing to represent their solution.",
-    elements: [
-      "Detailed explanation of innovation in solution",
-      "Detailed model or drawing that represents the solution",
-    ],
-  },
-  {
-    category: "ITERATE",
-    description:
-      "Team shared their ideas with others, collected feedback, and included improvements to their solution.",
-    elements: [
-      "Solution shared with multiple people/groups",
-      "Clear evidence of improvements based on feedback",
-    ],
-  },
-  {
-    category: "COMMUNICATE",
-    description:
-      "Team shared an effective presentation of their solution, its impact on others, and celebrated their team's progress.",
-    elements: [
-      "Clear explanation of solution and its potential impact on others",
-      "Presentation clearly shows pride or enthusiasm for their work",
-    ],
-  },
-];
-
 interface ConversationMessage {
   from: "user" | "assistant";
   text: string;
