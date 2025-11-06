@@ -234,36 +234,42 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Header with Background Image */}
+      {/* Hero Image */}
       <div
-        className="relative bg-white shadow-lg overflow-hidden"
+        className="w-full shadow-md"
         style={{
           backgroundImage: "url(/project-team-presenting.png)",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          minHeight: "50vh",
+          height: "35vh",
+          minHeight: "250px",
         }}
-      >
-        <div className="relative z-10 max-w-7xl mx-auto px-4 pt-12 pb-24">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-lg">
+      />
+
+      {/* Title Header Section */}
+      <div className="bg-gradient-to-br from-[#0066B3] to-[#004a8a] shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
               FIRST LEGO League Innovation Project Coach
             </h1>
-            <p className="text-lg text-white drop-shadow-lg">
+            <p className="text-lg md:text-xl text-white/95">
               AI-Powered Coaching for Your Innovation Project
             </p>
           </div>
 
           {error && (
-            <div className="max-w-2xl mx-auto mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+            <div className="max-w-2xl mx-auto mt-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
               {error}
             </div>
           )}
         </div>
+      </div>
 
-        {/* Bar Visualizer - Positioned at bottom center of header */}
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-20">
+      {/* Main Content Area */}
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Bar Visualizer */}
+        <div className="max-w-4xl mx-auto mb-12">
           <div
             className="cursor-pointer"
             onClick={() => {
@@ -279,18 +285,16 @@ export default function Home() {
               }
             }}
           >
-            <div className="bg-white rounded-2xl p-6 shadow-2xl border-2 border-[#0066B3]/30">
-              <div className="w-[600px] max-w-[90vw]">
-                <BarVisualizer
-                  state={agentState}
-                  barCount={20}
-                  mediaStream={visualizerStream}
-                  minHeight={10}
-                  maxHeight={95}
-                  className="w-full h-32 bg-gray-50 rounded-lg"
-                  key={visualizerStream?.id || 'no-stream'}
-                />
-              </div>
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#0066B3]/20">
+              <BarVisualizer
+                state={agentState}
+                barCount={20}
+                mediaStream={visualizerStream}
+                minHeight={10}
+                maxHeight={95}
+                className="w-full h-32 bg-gray-50 rounded-lg"
+                key={visualizerStream?.id || 'no-stream'}
+              />
               <div className="mt-4 text-center">
                 <p className="text-xl font-semibold text-gray-800">
                   {getStatusText()}
@@ -315,13 +319,10 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 pt-32 pb-8">
         {/* Conversation Display */}
         {isConnected && (
-          <div className="max-w-4xl mx-auto mb-8">
+          <div className="max-w-4xl mx-auto mb-12">
             <Conversation className="h-[500px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
               <ConversationContent>
                 {messages.length === 0 ? (
