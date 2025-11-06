@@ -315,7 +315,7 @@ export default function Home() {
     ? (conversation.isSpeaking ? agentMediaStreamRef.current : userMediaStream)
     : null;
 
-  // Debug visualizer stream selection and test its audio levels
+  // Debug visualizer stream selection
   useEffect(() => {
     console.log('📊 Visualizer stream selection:', {
       conversationStatus: conversation.status,
@@ -338,41 +338,6 @@ export default function Home() {
         muted: t.muted,
         readyState: t.readyState
       })));
-
-      // TEST THE VISUALIZER STREAM DIRECTLY
-      try {
-        const testContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        const streamSource = testContext.createMediaStreamSource(visualizerStream);
-        const streamAnalyser = testContext.createAnalyser();
-        streamAnalyser.fftSize = 256;
-        streamSource.connect(streamAnalyser);
-
-        const streamDataArray = new Uint8Array(streamAnalyser.frequencyBinCount);
-        let checkCount = 0;
-        const maxChecks = 10;
-
-        const checkVisualizerStream = () => {
-          streamAnalyser.getByteFrequencyData(streamDataArray);
-          const sum = streamDataArray.reduce((a, b) => a + b, 0);
-          const avg = sum / streamDataArray.length;
-          console.log(`  🔍 VISUALIZER STREAM AUDIO CHECK #${checkCount + 1}:`, avg.toFixed(2), 'active:', avg > 0);
-
-          checkCount++;
-          if (avg > 0) {
-            console.log('  ✅✅✅ VISUALIZER STREAM HAS AUDIO DATA! ✅✅✅');
-            testContext.close();
-          } else if (checkCount < maxChecks) {
-            setTimeout(checkVisualizerStream, 200);
-          } else {
-            console.log('  ❌ VISUALIZER STREAM: No audio detected after', maxChecks, 'checks');
-            testContext.close();
-          }
-        };
-
-        setTimeout(checkVisualizerStream, 100);
-      } catch (err) {
-        console.error('  ❌ Failed to analyze visualizer stream:', err);
-      }
     }
   }, [conversation.status, conversation.isSpeaking, agentState, userMediaStream, visualizerStream]);
 
