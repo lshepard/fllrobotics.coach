@@ -4,9 +4,52 @@ import './App.css'
 
 const AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd"
 
+const rubricData = [
+  {
+    category: "IDENTIFY",
+    description: "Team had a clearly defined problem that was well researched.",
+    elements: [
+      "Clear definition of the problem",
+      "Clear, detailed research from a variety of sources"
+    ]
+  },
+  {
+    category: "DESIGN",
+    description: "Team worked together while creating a project plan and developing their ideas.",
+    elements: [
+      "Clear evidence of an effective project plan",
+      "Clear evidence that development process involved all team members"
+    ]
+  },
+  {
+    category: "CREATE",
+    description: "Team developed an original idea or built on an existing one with a prototype model/drawing to represent their solution.",
+    elements: [
+      "Detailed explanation of innovation in solution",
+      "Detailed model or drawing that represents the solution"
+    ]
+  },
+  {
+    category: "ITERATE",
+    description: "Team shared their ideas with others, collected feedback, and included improvements to their solution.",
+    elements: [
+      "Solution shared with multiple people/groups",
+      "Clear evidence of improvements based on feedback"
+    ]
+  },
+  {
+    category: "COMMUNICATE",
+    description: "Team shared an effective presentation of their solution, its impact on others, and celebrated their team's progress.",
+    elements: [
+      "Clear explanation of solution and its potential impact on others",
+      "Presentation clearly shows pride or enthusiasm for their work"
+    ]
+  }
+]
+
 function App() {
-  const [status, setStatus] = useState({ text: 'Disconnected', type: 'disconnected' })
-  const [messages, setMessages] = useState([{ text: 'Ready to start conversation...', type: 'system' }])
+  const [status, setStatus] = useState({ text: 'Ready to help', type: 'disconnected' })
+  const [messages, setMessages] = useState([{ text: 'Click the coach to start your session...', type: 'system' }])
   const [error, setError] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -51,22 +94,22 @@ function App() {
 
       await navigator.mediaDevices.getUserMedia({ audio: true })
 
-      updateStatus('Connecting to agent...', 'connecting')
-      addMessage('Connecting to voice agent...', 'system')
+      updateStatus('Connecting...', 'connecting')
+      addMessage('Connecting to your coach...', 'system')
 
       conversationRef.current = await Conversation.startSession({
         agentId: AGENT_ID,
         connectionType: 'webrtc',
 
         onConnect: () => {
-          updateStatus('Connected - Agent is listening', 'connected')
-          addMessage('Connected! You can now speak to the agent.', 'system')
+          updateStatus('Coach is listening', 'connected')
+          addMessage('Connected! Your coach is ready to help.', 'system')
           setIsConnected(true)
         },
 
         onDisconnect: () => {
-          updateStatus('Disconnected', 'disconnected')
-          addMessage('Disconnected from agent.', 'system')
+          updateStatus('Session ended', 'disconnected')
+          addMessage('Session ended.', 'system')
           setIsConnected(false)
           conversationRef.current = null
         },
@@ -76,7 +119,7 @@ function App() {
           if (message.type === 'user_transcript') {
             addMessage(`You: ${message.message}`, 'user')
           } else if (message.type === 'agent_response') {
-            addMessage(`Agent: ${message.message}`, 'agent')
+            addMessage(`Coach: ${message.message}`, 'agent')
           }
         },
 
@@ -92,9 +135,9 @@ function App() {
         onModeChange: (mode) => {
           console.log('Mode changed:', mode)
           if (mode.mode === 'speaking') {
-            updateStatus('Agent is speaking...', 'connected')
+            updateStatus('Coach is speaking...', 'connected')
           } else if (mode.mode === 'listening') {
-            updateStatus('Agent is listening...', 'connected')
+            updateStatus('Coach is listening...', 'connected')
           }
         }
       })
@@ -102,7 +145,7 @@ function App() {
     } catch (error) {
       console.error('Failed to start conversation:', error)
       showError(`Failed to start: ${error.message}`)
-      updateStatus('Failed to connect', 'disconnected')
+      updateStatus('Connection failed', 'disconnected')
     }
   }
 
@@ -111,10 +154,10 @@ function App() {
       try {
         await conversationRef.current.endSession()
         conversationRef.current = null
-        updateStatus('Disconnected', 'disconnected')
+        updateStatus('Session ended', 'disconnected')
       } catch (error) {
         console.error('Failed to end conversation:', error)
-        showError(`Failed to end conversation: ${error.message}`)
+        showError(`Failed to end session: ${error.message}`)
       }
     }
   }
@@ -138,7 +181,7 @@ function App() {
     if (message && conversationRef.current) {
       try {
         await conversationRef.current.sendUserMessage(message)
-        addMessage(`You (text): ${message}`, 'user')
+        addMessage(`You: ${message}`, 'user')
         setMessageInput('')
       } catch (error) {
         console.error('Failed to send message:', error)
@@ -167,84 +210,135 @@ function App() {
 
   return (
     <div className="app">
+      <header className="header">
+        <div className="header-content">
+          <h1>FIRST LEGO League Innovation Project Coach</h1>
+          <p className="subtitle">AI-Powered Coaching for Your Innovation Project</p>
+        </div>
+      </header>
+
       <div className="container">
-        <h1>🎙️ Voice Agent</h1>
-
-        <div className={`status ${status.type}`}>
-          {status.text}
-        </div>
-
-        {error && (
-          <div className="error show">
-            {error}
+        {/* Agent Interface Section */}
+        <div className="agent-section">
+          <div
+            className={`agent-circle ${status.type}`}
+            onClick={!isConnected ? startConversation : null}
+            style={{ cursor: !isConnected ? 'pointer' : 'default' }}
+          >
+            <div className="agent-icon">🤖</div>
+            <div className="agent-status">{status.text}</div>
           </div>
-        )}
 
-        <div className="controls">
-          <button
-            className="btn-start"
-            onClick={startConversation}
-            disabled={isConnected}
-          >
-            Start Conversation
-          </button>
-          <button
-            className="btn-end"
-            onClick={endConversation}
-            disabled={!isConnected}
-          >
-            End Conversation
-          </button>
-          <button
-            className={isMuted ? 'btn-unmute' : 'btn-mute'}
-            onClick={toggleMute}
-            disabled={!isConnected}
-          >
-            {isMuted ? 'Unmute Microphone' : 'Mute Microphone'}
-          </button>
-        </div>
-
-        <div className="volume-control">
-          <label htmlFor="volumeSlider">
-            Agent Volume: <span>{volume}%</span>
-          </label>
-          <input
-            type="range"
-            id="volumeSlider"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => handleVolumeChange(e.target.value)}
-          />
-        </div>
-
-        <div className="message-input">
-          <input
-            type="text"
-            placeholder="Type a message to the agent..."
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={!isConnected}
-          />
-          <button
-            className="btn-send"
-            onClick={sendMessage}
-            disabled={!isConnected}
-          >
-            Send
-          </button>
-        </div>
-
-        <div className="messages">
-          {messages.map((msg, index) => (
-            <div key={index} className={`message ${msg.type}`}>
-              {msg.text}
+          {error && (
+            <div className="error show">
+              {error}
             </div>
-          ))}
-          <div ref={messagesEndRef} />
+          )}
+
+          <div className="controls">
+            <button
+              className="btn-primary"
+              onClick={startConversation}
+              disabled={isConnected}
+            >
+              Start Session
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={endConversation}
+              disabled={!isConnected}
+            >
+              End Session
+            </button>
+            <button
+              className={`btn-secondary ${isMuted ? 'muted' : ''}`}
+              onClick={toggleMute}
+              disabled={!isConnected}
+            >
+              {isMuted ? '🔇 Unmute' : '🎤 Mute'}
+            </button>
+          </div>
+
+          <div className="volume-control">
+            <label htmlFor="volumeSlider">
+              Volume: <span>{volume}%</span>
+            </label>
+            <input
+              type="range"
+              id="volumeSlider"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => handleVolumeChange(e.target.value)}
+            />
+          </div>
+
+          <div className="message-input">
+            <input
+              type="text"
+              placeholder="Type a message to your coach..."
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={!isConnected}
+            />
+            <button
+              className="btn-send"
+              onClick={sendMessage}
+              disabled={!isConnected}
+            >
+              Send
+            </button>
+          </div>
+
+          <div className="messages">
+            {messages.map((msg, index) => (
+              <div key={index} className={`message ${msg.type}`}>
+                {msg.text}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Rubric Section */}
+        <div className="rubric-section">
+          <div className="rubric-header">
+            <h2>Innovation Project Rubric</h2>
+            <a
+              href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rubric-link"
+            >
+              View Official Rubric PDF
+            </a>
+          </div>
+
+          <div className="rubric-table">
+            {rubricData.map((section, idx) => (
+              <div key={idx} className="rubric-category">
+                <div className="category-header">
+                  <h3>{section.category}</h3>
+                  <p>{section.description}</p>
+                </div>
+                <div className="category-elements">
+                  {section.elements.map((element, elemIdx) => (
+                    <div key={elemIdx} className="rubric-element">
+                      <span className="element-checkbox">☐</span>
+                      <span className="element-text">{element}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      <footer className="footer">
+        <p>FIRST® LEGO® League is a registered trademark of FIRST®</p>
+      </footer>
     </div>
   )
 }
