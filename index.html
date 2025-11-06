@@ -3,17 +3,460 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Agent</title>
+    <title>ElevenLabs Voice Agent</title>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .status.disconnected {
+            background: #fee;
+            color: #c33;
+        }
+
+        .status.connecting {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+
+        .status.connected {
+            background: #d5f4e6;
+            color: #00b894;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-direction: column;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-end {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-mute {
+            background: #74b9ff;
+            color: white;
+        }
+
+        .btn-unmute {
+            background: #fdcb6e;
+            color: white;
+        }
+
+        .message-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-send {
+            background: #667eea;
+            color: white;
+            padding: 12px 25px;
+        }
+
+        .messages {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .message.agent {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .message.system {
+            background: #fff3e0;
+            color: #f57c00;
+            font-style: italic;
+        }
+
+        .volume-control {
+            margin-bottom: 20px;
+        }
+
+        .volume-control label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <elevenlabs-convai agent-id="agent_01jvcwy4xseqg8qjgw6wbgsywd"></elevenlabs-convai>
-    <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+    <div class="container">
+        <h1>🎙️ Voice Agent</h1>
+
+        <div class="status disconnected" id="status">
+            Disconnected
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="controls">
+            <button class="btn-start" id="startBtn" onclick="startConversation()">
+                Start Conversation
+            </button>
+            <button class="btn-end" id="endBtn" onclick="endConversation()" disabled>
+                End Conversation
+            </button>
+            <button class="btn-mute" id="muteBtn" onclick="toggleMute()" disabled>
+                Mute Microphone
+            </button>
+        </div>
+
+        <div class="volume-control">
+            <label for="volumeSlider">Agent Volume: <span id="volumeValue">100%</span></label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="100" onchange="changeVolume(this.value)">
+        </div>
+
+        <div class="message-input">
+            <input type="text" id="messageInput" placeholder="Type a message to the agent..." disabled>
+            <button class="btn-send" id="sendBtn" onclick="sendMessage()" disabled>
+                Send
+            </button>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="message system">Ready to start conversation...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Conversation } from 'https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm';
+
+        const AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
+
+        let conversation = null;
+        let isMuted = false;
+
+        // UI Elements
+        const statusEl = document.getElementById('status');
+        const errorEl = document.getElementById('error');
+        const startBtn = document.getElementById('startBtn');
+        const endBtn = document.getElementById('endBtn');
+        const muteBtn = document.getElementById('muteBtn');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const messagesEl = document.getElementById('messages');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+
+        // Make functions globally accessible
+        window.startConversation = startConversation;
+        window.endConversation = endConversation;
+        window.toggleMute = toggleMute;
+        window.sendMessage = sendMessage;
+        window.changeVolume = changeVolume;
+
+        function updateStatus(status, type) {
+            statusEl.textContent = status;
+            statusEl.className = `status ${type}`;
+        }
+
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            messagesEl.appendChild(messageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+            }, 5000);
+        }
+
+        async function startConversation() {
+            try {
+                updateStatus('Requesting microphone access...', 'connecting');
+
+                // Request microphone permission
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                updateStatus('Connecting to agent...', 'connecting');
+                addMessage('Connecting to voice agent...', 'system');
+
+                // Start the conversation
+                conversation = await Conversation.startSession({
+                    agentId: AGENT_ID,
+                    connectionType: 'webrtc',
+
+                    onConnect: () => {
+                        updateStatus('Connected - Agent is listening', 'connected');
+                        addMessage('Connected! You can now speak to the agent.', 'system');
+                        startBtn.disabled = true;
+                        endBtn.disabled = false;
+                        muteBtn.disabled = false;
+                        messageInput.disabled = false;
+                        sendBtn.disabled = false;
+                    },
+
+                    onDisconnect: () => {
+                        updateStatus('Disconnected', 'disconnected');
+                        addMessage('Disconnected from agent.', 'system');
+                        startBtn.disabled = false;
+                        endBtn.disabled = true;
+                        muteBtn.disabled = true;
+                        messageInput.disabled = true;
+                        sendBtn.disabled = true;
+                    },
+
+                    onMessage: (message) => {
+                        console.log('Message received:', message);
+                        if (message.type === 'user_transcript') {
+                            addMessage(`You: ${message.message}`, 'user');
+                        } else if (message.type === 'agent_response') {
+                            addMessage(`Agent: ${message.message}`, 'agent');
+                        }
+                    },
+
+                    onError: (error) => {
+                        console.error('Conversation error:', error);
+                        showError(`Error: ${error.message || 'An error occurred'}`);
+                    },
+
+                    onStatusChange: (status) => {
+                        console.log('Status changed:', status);
+                    },
+
+                    onModeChange: (mode) => {
+                        console.log('Mode changed:', mode);
+                        if (mode.mode === 'speaking') {
+                            updateStatus('Agent is speaking...', 'connected');
+                        } else if (mode.mode === 'listening') {
+                            updateStatus('Agent is listening...', 'connected');
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Failed to start conversation:', error);
+                showError(`Failed to start: ${error.message}`);
+                updateStatus('Failed to connect', 'disconnected');
+                startBtn.disabled = false;
+            }
+        }
+
+        async function endConversation() {
+            if (conversation) {
+                try {
+                    await conversation.endSession();
+                    conversation = null;
+                    updateStatus('Disconnected', 'disconnected');
+                } catch (error) {
+                    console.error('Failed to end conversation:', error);
+                    showError(`Failed to end conversation: ${error.message}`);
+                }
+            }
+        }
+
+        async function toggleMute() {
+            if (conversation) {
+                try {
+                    isMuted = !isMuted;
+                    await conversation.setMicMuted(isMuted);
+                    muteBtn.textContent = isMuted ? 'Unmute Microphone' : 'Mute Microphone';
+                    muteBtn.className = isMuted ? 'btn-unmute' : 'btn-mute';
+                    addMessage(isMuted ? 'Microphone muted' : 'Microphone unmuted', 'system');
+                } catch (error) {
+                    console.error('Failed to toggle mute:', error);
+                    showError(`Failed to toggle mute: ${error.message}`);
+                }
+            }
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && conversation) {
+                try {
+                    await conversation.sendUserMessage(message);
+                    addMessage(`You (text): ${message}`, 'user');
+                    messageInput.value = '';
+                } catch (error) {
+                    console.error('Failed to send message:', error);
+                    showError(`Failed to send message: ${error.message}`);
+                }
+            }
+        }
+
+        function changeVolume(value) {
+            const volume = value / 100;
+            volumeValue.textContent = `${value}%`;
+            if (conversation) {
+                try {
+                    conversation.setVolume({ volume });
+                } catch (error) {
+                    console.error('Failed to set volume:', error);
+                }
+            }
+        }
+
+        // Allow Enter key to send messages
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) {
+                sendMessage();
+            }
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (conversation) {
+                conversation.endSession();
+            }
+        });
+    </script>
 </body>
 </html>
