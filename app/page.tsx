@@ -164,7 +164,7 @@ export default function Home() {
     }
 
     // Try to find the audio element created by ElevenLabs
-    const findAndCaptureAudio = () => {
+    const findAndCaptureAudio = async () => {
       const audioElements = document.querySelectorAll('audio');
       console.log('🔊 Found', audioElements.length, 'audio elements in DOM');
 
@@ -183,7 +183,13 @@ export default function Home() {
             if (!audioContextRef.current) {
               const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
               audioContextRef.current = new AudioContextClass();
-              console.log('✅ Created AudioContext');
+              console.log('✅ Created AudioContext, state:', audioContextRef.current.state);
+            }
+
+            // Resume audio context if suspended
+            if (audioContextRef.current.state === 'suspended') {
+              await audioContextRef.current.resume();
+              console.log('✅ Resumed AudioContext');
             }
 
             // Create a media stream destination
@@ -304,6 +310,7 @@ export default function Home() {
                     minHeight={10}
                     maxHeight={95}
                     className="w-full h-48 bg-gray-100 border-2 border-[#0066B3]/20"
+                    key={visualizerStream?.id || 'no-stream'}
                   />
                 </div>
                 <div className="mt-6 text-center">
