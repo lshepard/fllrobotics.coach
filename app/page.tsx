@@ -68,9 +68,10 @@ export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [userMediaStream, setUserMediaStream] = useState<MediaStream | null>(null);
-  const [agentMediaStream, setAgentMediaStream] = useState<MediaStream | null>(null);
+  const agentMediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const [, forceUpdate] = useState({});
 
   const conversation = useConversation({
     agentId: AGENT_ID,
@@ -123,9 +124,9 @@ export default function Home() {
         setUserMediaStream(null);
       }
       // Clean up agent media stream
-      if (agentMediaStream) {
-        agentMediaStream.getTracks().forEach(track => track.stop());
-        setAgentMediaStream(null);
+      if (agentMediaStreamRef.current) {
+        agentMediaStreamRef.current.getTracks().forEach(track => track.stop());
+        agentMediaStreamRef.current = null;
       }
       // Clean up audio context
       if (audioContextRef.current) {
@@ -200,7 +201,8 @@ export default function Home() {
 
             // Store the audio element and stream
             audioElementRef.current = audio;
-            setAgentMediaStream(destination.stream);
+            agentMediaStreamRef.current = destination.stream;
+            forceUpdate({}); // Force re-render to update visualizer
             console.log('✅ Set agentMediaStream:', destination.stream);
 
             return true;
@@ -227,21 +229,8 @@ export default function Home() {
 
   // Use user's microphone stream when listening, agent's audio when speaking
   const visualizerStream = conversation.status === "connected"
-    ? (conversation.isSpeaking ? agentMediaStream : userMediaStream)
+    ? (conversation.isSpeaking ? agentMediaStreamRef.current : userMediaStream)
     : null;
-
-  // Debug agentMediaStream changes
-  useEffect(() => {
-    console.log('🎤 agentMediaStream changed:', agentMediaStream);
-    if (agentMediaStream) {
-      const tracks = agentMediaStream.getTracks();
-      console.log('  ➜ Tracks:', tracks.length, tracks.map(t => ({
-        kind: t.kind,
-        enabled: t.enabled,
-        readyState: t.readyState
-      })));
-    }
-  }, [agentMediaStream]);
 
   // Debug visualizer stream selection
   useEffect(() => {
@@ -249,12 +238,13 @@ export default function Home() {
       conversationStatus: conversation.status,
       isSpeaking: conversation.isSpeaking,
       agentState,
-      hasAgentMediaStream: !!agentMediaStream,
+      hasAgentMediaStream: !!agentMediaStreamRef.current,
       hasUserMediaStream: !!userMediaStream,
       selectedStream: conversation.isSpeaking ? 'agentMediaStream' : 'userMediaStream',
-      visualizerStream: visualizerStream
+      visualizerStream: visualizerStream,
+      agentStreamId: agentMediaStreamRef.current?.id
     });
-  }, [conversation.status, conversation.isSpeaking, agentState, agentMediaStream, userMediaStream, visualizerStream]);
+  }, [conversation.status, conversation.isSpeaking, agentState, userMediaStream, visualizerStream]);
 
   return (
     <div className="min-h-screen bg-gray-50">
