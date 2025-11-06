@@ -155,15 +155,26 @@ export default function Home() {
 
   // Effect to capture agent's audio output
   useEffect(() => {
+    console.log('🔍 Audio capture effect running. isConnected:', isConnected);
+
     if (!isConnected) {
+      console.log('❌ Not connected, skipping audio capture');
       return;
     }
 
     // Try to find the audio element created by ElevenLabs
     const findAndCaptureAudio = () => {
       const audioElements = document.querySelectorAll('audio');
+      console.log('🔊 Found', audioElements.length, 'audio elements in DOM');
 
       for (const audio of audioElements) {
+        console.log('🎵 Checking audio element:', {
+          src: audio.src,
+          srcObject: audio.srcObject,
+          paused: audio.paused,
+          currentTime: audio.currentTime
+        });
+
         // Check if this audio element is actively playing or has a source
         if (audio.src || audio.srcObject) {
           try {
@@ -171,35 +182,45 @@ export default function Home() {
             if (!audioContextRef.current) {
               const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
               audioContextRef.current = new AudioContextClass();
+              console.log('✅ Created AudioContext');
             }
 
             // Create a media stream destination
             const destination = audioContextRef.current.createMediaStreamDestination();
+            console.log('✅ Created MediaStreamDestination');
 
             // Create source from audio element
             const source = audioContextRef.current.createMediaElementSource(audio);
+            console.log('✅ Created MediaElementSource');
 
             // Connect to both destination (for capture) and context destination (for playback)
             source.connect(destination);
             source.connect(audioContextRef.current.destination);
+            console.log('✅ Connected audio nodes');
 
             // Store the audio element and stream
             audioElementRef.current = audio;
             setAgentMediaStream(destination.stream);
+            console.log('✅ Set agentMediaStream:', destination.stream);
 
             return true;
           } catch (err) {
-            console.warn('Failed to capture audio element:', err);
+            console.warn('❌ Failed to capture audio element:', err);
           }
         }
       }
+      console.log('❌ No suitable audio element found');
       return false;
     };
 
     // Try immediately
     if (!findAndCaptureAudio()) {
+      console.log('⏳ Audio element not found, retrying in 500ms...');
       // If not found, try again after a short delay
-      const timeoutId = setTimeout(findAndCaptureAudio, 500);
+      const timeoutId = setTimeout(() => {
+        console.log('🔄 Retrying audio capture...');
+        findAndCaptureAudio();
+      }, 500);
       return () => clearTimeout(timeoutId);
     }
   }, [isConnected]);
@@ -208,6 +229,32 @@ export default function Home() {
   const visualizerStream = conversation.status === "connected"
     ? (conversation.isSpeaking ? agentMediaStream : userMediaStream)
     : null;
+
+  // Debug agentMediaStream changes
+  useEffect(() => {
+    console.log('🎤 agentMediaStream changed:', agentMediaStream);
+    if (agentMediaStream) {
+      const tracks = agentMediaStream.getTracks();
+      console.log('  ➜ Tracks:', tracks.length, tracks.map(t => ({
+        kind: t.kind,
+        enabled: t.enabled,
+        readyState: t.readyState
+      })));
+    }
+  }, [agentMediaStream]);
+
+  // Debug visualizer stream selection
+  useEffect(() => {
+    console.log('📊 Visualizer stream selection:', {
+      conversationStatus: conversation.status,
+      isSpeaking: conversation.isSpeaking,
+      agentState,
+      hasAgentMediaStream: !!agentMediaStream,
+      hasUserMediaStream: !!userMediaStream,
+      selectedStream: conversation.isSpeaking ? 'agentMediaStream' : 'userMediaStream',
+      visualizerStream: visualizerStream
+    });
+  }, [conversation.status, conversation.isSpeaking, agentState, agentMediaStream, userMediaStream, visualizerStream]);
 
   return (
     <div className="min-h-screen bg-gray-50">
