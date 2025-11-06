@@ -67,7 +67,6 @@ interface ConversationMessage {
 export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [messageInput, setMessageInput] = useState("");
 
   const conversation = useConversation({
     agentId: AGENT_ID,
@@ -120,31 +119,6 @@ export default function Home() {
     }
   };
 
-  const toggleMute = () => {
-    try {
-      // @ts-expect-error - Type incompatibility with @elevenlabs/react
-      conversation.setMuted(!conversation.isMuted);
-    } catch (error: unknown) {
-      console.error("Failed to toggle mute:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      setError(`Failed to toggle mute: ${message}`);
-    }
-  };
-
-  const sendMessage = async () => {
-    const message = messageInput.trim();
-    if (message && conversation.status === "connected") {
-      try {
-        await conversation.sendUserMessage(message);
-        setMessageInput("");
-      } catch (error: unknown) {
-        console.error("Failed to send message:", error);
-        const message = error instanceof Error ? error.message : "Unknown error";
-        setError(`Failed to send message: ${message}`);
-      }
-    }
-  };
-
   const getStatusText = () => {
     if (conversation.status === "connected") {
       return conversation.isSpeaking ? "Speaking..." : "Listening...";
@@ -161,118 +135,110 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-[#0066B3] text-white py-5 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <h1 className="text-2xl font-semibold">
-            FIRST LEGO League Innovation Project Coach
-          </h1>
-          <p className="text-sm opacity-90 mt-1">
-            AI-Powered Coaching for Your Innovation Project
-          </p>
+      {/* Hero Section with Background */}
+      <div
+        className="relative bg-white shadow-lg overflow-hidden"
+        style={{
+          backgroundImage: "url(/project-team-presenting.png)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          minHeight: "60vh",
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0066B3]/95 via-[#0066B3]/90 to-white/95"></div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-white mb-3">
+              FIRST LEGO League Innovation Project Coach
+            </h1>
+            <p className="text-lg text-white/95">
+              AI-Powered Coaching for Your Innovation Project
+            </p>
+          </div>
+
+          {error && (
+            <div className="max-w-2xl mx-auto mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {/* Interactive Coach Area - Click to Start */}
+          <div
+            className="max-w-3xl mx-auto"
+            onClick={() => {
+              if (!isConnected) {
+                startConversation();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyPress={(e) => {
+              if (e.key === "Enter" && !isConnected) {
+                startConversation();
+              }
+            }}
+          >
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
+              {/* BarVisualizer - Prominent and Visible */}
+              <div className="flex flex-col items-center mb-6">
+                <div className="w-full max-w-xl">
+                  <BarVisualizer
+                    state={agentState}
+                    barCount={20}
+                    className="w-full h-48 bg-gray-100 border-2 border-[#0066B3]/20"
+                  />
+                </div>
+                <div className="mt-6 text-center">
+                  <p className="text-2xl font-semibold text-gray-800">
+                    {getStatusText()}
+                  </p>
+                  {!isConnected && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Click anywhere to start your coaching session
+                    </p>
+                  )}
+                  {isConnected && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        endConversation();
+                      }}
+                      className="mt-3 px-6 py-2 bg-[#ED1C24] text-white rounded-lg font-medium hover:bg-[#C41E3A] transition"
+                    >
+                      End Session
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Conversation Display */}
+          {isConnected && (
+            <div className="max-w-3xl mx-auto mt-6">
+              <Conversation className="h-96 bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-[#0066B3]/20">
+                <ConversationContent>
+                  {messages.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      Start talking with your coach...
+                    </div>
+                  ) : (
+                    messages.map((msg, idx) => (
+                      <Message key={idx} from={msg.from}>
+                        <MessageContent>{msg.text}</MessageContent>
+                      </Message>
+                    ))
+                  )}
+                </ConversationContent>
+              </Conversation>
+            </div>
+          )}
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Coach Section */}
-        <div
-          className="bg-white rounded-2xl p-8 mb-8 shadow-md relative overflow-hidden"
-          style={{
-            backgroundImage: "url(/project-team-presenting.png)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        >
-          <div className="absolute inset-0 bg-white/85 rounded-2xl"></div>
-          <div className="relative z-10">
-            {/* BarVisualizer */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-64 h-48 flex items-center justify-center">
-                <BarVisualizer
-                  state={agentState}
-                  barCount={15}
-                  className="w-full h-32"
-                />
-              </div>
-              <p className="text-sm font-medium text-gray-700 mt-2">
-                {getStatusText()}
-              </p>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
-                {error}
-              </div>
-            )}
-
-            {/* Controls */}
-            <div className="flex gap-3 justify-center mb-6 flex-wrap">
-              <button
-                onClick={startConversation}
-                disabled={isConnected}
-                className="px-6 py-2 bg-[#0066B3] text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#004A8F] transition"
-              >
-                Start Session
-              </button>
-              <button
-                onClick={endConversation}
-                disabled={!isConnected}
-                className="px-6 py-2 bg-[#ED1C24] text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#C41E3A] transition"
-              >
-                End Session
-              </button>
-              <button
-                onClick={toggleMute}
-                disabled={!isConnected}
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition"
-              >
-                {/* @ts-expect-error - Type incompatibility with @elevenlabs/react */}
-                {conversation.isMuted ? "🔇 Unmute" : "🎤 Mute"}
-              </button>
-            </div>
-
-            {/* Text Input */}
-            <div className="flex gap-2 mb-6">
-              <input
-                type="text"
-                placeholder="Type a message to your coach..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter" && isConnected) {
-                    sendMessage();
-                  }
-                }}
-                disabled={!isConnected}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0066B3] disabled:bg-gray-100"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!isConnected}
-                className="px-6 py-2 bg-[#0066B3] text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#004A8F] transition"
-              >
-                Send
-              </button>
-            </div>
-
-            {/* Conversation Display */}
-            <Conversation className="h-64 bg-gray-50 rounded-lg border border-gray-200">
-              <ConversationContent>
-                {messages.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    Start a conversation with your coach...
-                  </div>
-                ) : (
-                  messages.map((msg, idx) => (
-                    <Message key={idx} from={msg.from}>
-                      <MessageContent>{msg.text}</MessageContent>
-                    </Message>
-                  ))
-                )}
-              </ConversationContent>
-            </Conversation>
-          </div>
-        </div>
 
         {/* Rubric Section */}
         <div className="bg-white rounded-2xl p-8 shadow-md">
