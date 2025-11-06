@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useConversation } from "@elevenlabs/react";
 import { BarVisualizer } from "@/components/ui/bar-visualizer";
 import {
@@ -68,6 +68,9 @@ export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [userMediaStream, setUserMediaStream] = useState<MediaStream | null>(null);
+  const [agentMediaStream, setAgentMediaStream] = useState<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   const conversation = useConversation({
     agentId: AGENT_ID,
@@ -119,6 +122,16 @@ export default function Home() {
         userMediaStream.getTracks().forEach(track => track.stop());
         setUserMediaStream(null);
       }
+      // Clean up agent media stream
+      if (agentMediaStream) {
+        agentMediaStream.getTracks().forEach(track => track.stop());
+        setAgentMediaStream(null);
+      }
+      // Clean up audio context
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
     } catch (error: unknown) {
       console.error("Failed to end conversation:", error);
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -140,13 +153,60 @@ export default function Home() {
     ? (conversation.isSpeaking ? "speaking" : "listening")
     : undefined;
 
-  // Get audio stream from conversation for visualizer
-  // @ts-expect-error - Type incompatibility with @elevenlabs/react
-  const agentAudioStream = conversation.audioStream || null;
+  // Effect to capture agent's audio output
+  useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+
+    // Try to find the audio element created by ElevenLabs
+    const findAndCaptureAudio = () => {
+      const audioElements = document.querySelectorAll('audio');
+
+      for (const audio of audioElements) {
+        // Check if this audio element is actively playing or has a source
+        if (audio.src || audio.srcObject) {
+          try {
+            // Create audio context if it doesn't exist
+            if (!audioContextRef.current) {
+              const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+              audioContextRef.current = new AudioContextClass();
+            }
+
+            // Create a media stream destination
+            const destination = audioContextRef.current.createMediaStreamDestination();
+
+            // Create source from audio element
+            const source = audioContextRef.current.createMediaElementSource(audio);
+
+            // Connect to both destination (for capture) and context destination (for playback)
+            source.connect(destination);
+            source.connect(audioContextRef.current.destination);
+
+            // Store the audio element and stream
+            audioElementRef.current = audio;
+            setAgentMediaStream(destination.stream);
+
+            return true;
+          } catch (err) {
+            console.warn('Failed to capture audio element:', err);
+          }
+        }
+      }
+      return false;
+    };
+
+    // Try immediately
+    if (!findAndCaptureAudio()) {
+      // If not found, try again after a short delay
+      const timeoutId = setTimeout(findAndCaptureAudio, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected]);
 
   // Use user's microphone stream when listening, agent's audio when speaking
   const visualizerStream = conversation.status === "connected"
-    ? (conversation.isSpeaking ? agentAudioStream : userMediaStream)
+    ? (conversation.isSpeaking ? agentMediaStream : userMediaStream)
     : null;
 
   return (
