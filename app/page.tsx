@@ -163,22 +163,33 @@ export default function Home() {
       return;
     }
 
+    let captureAttempted = false;
+
     // Try to find the audio element created by ElevenLabs
-    const findAndCaptureAudio = async () => {
-      const audioElements = document.querySelectorAll('audio');
-      console.log('🔊 Found', audioElements.length, 'audio elements in DOM');
+    const findAndCaptureAudio = async (audio: HTMLAudioElement) => {
+      // Skip if already captured this element
+      if (audio === audioElementRef.current) {
+        console.log('⏭️ Audio element already captured, skipping');
+        return;
+      }
 
-      for (const audio of audioElements) {
-        console.log('🎵 Checking audio element:', {
-          src: audio.src,
-          srcObject: audio.srcObject,
-          paused: audio.paused,
-          currentTime: audio.currentTime
-        });
+      if (captureAttempted) {
+        console.log('⏭️ Capture already attempted, skipping');
+        return;
+      }
 
-        // Check if this audio element is actively playing or has a source
-        if (audio.src || audio.srcObject) {
+      console.log('🎵 Attempting to capture audio element:', {
+        src: audio.src,
+        srcObject: audio.srcObject,
+        paused: audio.paused,
+        currentTime: audio.currentTime,
+        volume: audio.volume
+      });
+
+      // Check if this audio element is actively playing or has a source
+      if (audio.src || audio.srcObject) {
           try {
+            captureAttempted = true;
             // Create audio context if it doesn't exist
             if (!audioContextRef.current) {
               const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -243,26 +254,60 @@ export default function Home() {
             };
             setTimeout(checkAudio, 100);
 
-            return true;
+            return;
           } catch (err) {
             console.warn('❌ Failed to capture audio element:', err);
           }
         }
-      }
-      console.log('❌ No suitable audio element found');
-      return false;
+      };
+
+    // Listen for audio elements starting to play
+    const handlePlay = (event: Event) => {
+      const audio = event.target as HTMLAudioElement;
+      console.log('▶️ Audio element started playing!', audio);
+      findAndCaptureAudio(audio);
     };
 
-    // Try immediately
-    if (!findAndCaptureAudio()) {
-      console.log('⏳ Audio element not found, retrying in 500ms...');
-      // If not found, try again after a short delay
-      const timeoutId = setTimeout(() => {
-        console.log('🔄 Retrying audio capture...');
-        findAndCaptureAudio();
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    }
+    // Find existing audio elements and add listeners
+    const setupAudioListeners = () => {
+      const audioElements = document.querySelectorAll('audio');
+      console.log('🔊 Found', audioElements.length, 'audio elements in DOM');
+
+      audioElements.forEach(audio => {
+        // Try to capture immediately if it's already playing
+        if (!audio.paused && audio.currentTime > 0) {
+          console.log('🎵 Found already-playing audio element');
+          findAndCaptureAudio(audio);
+        }
+
+        // Listen for play events
+        audio.addEventListener('play', handlePlay);
+        console.log('👂 Added play listener to audio element');
+      });
+    };
+
+    // Set up listeners immediately
+    setupAudioListeners();
+
+    // Also watch for new audio elements being added
+    const observer = new MutationObserver(() => {
+      if (!captureAttempted) {
+        setupAudioListeners();
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Cleanup
+    return () => {
+      observer.disconnect();
+      document.querySelectorAll('audio').forEach(audio => {
+        audio.removeEventListener('play', handlePlay);
+      });
+    };
   }, [isConnected]);
 
   // Use user's microphone stream when listening, agent's audio when speaking
