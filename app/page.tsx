@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useConversation } from "@elevenlabs/react";
 import { BarVisualizer } from "@/components/ui/bar-visualizer";
 import {
@@ -16,6 +16,15 @@ interface ConversationMessage {
   text: string;
 }
 
+interface RubricNotes {
+  teamInfo: string;
+  problem: string;
+  sources: string;
+  solution: string;
+  sharedWith: string;
+  iterations: string;
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +34,58 @@ export default function Home() {
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const [, forceUpdate] = useState({});
 
+  // Rubric notes state
+  const [rubricNotes, setRubricNotes] = useState<RubricNotes>({
+    teamInfo: "",
+    problem: "",
+    sources: "",
+    solution: "",
+    sharedWith: "",
+    iterations: ""
+  });
+  const [recentlyUpdated, setRecentlyUpdated] = useState<keyof RubricNotes | null>(null);
+
+  // Client tool function for updating rubric notes
+  const updateRubricNotes = useCallback(({ area, notes }: { area: keyof RubricNotes, notes: string }) => {
+    console.log(`[Client Tool] updateRubricNotes called:`, { area, notes });
+
+    // Update state
+    setRubricNotes(prev => ({
+      ...prev,
+      [area]: notes
+    }));
+
+    // Trigger animation
+    setRecentlyUpdated(area);
+    setTimeout(() => setRecentlyUpdated(null), 2000);
+
+    // Build updated notes object for context
+    const updated: RubricNotes = {
+      ...rubricNotes,
+      [area]: notes
+    };
+
+    // Format context for agent
+    const contextParts = [
+      `Updated ${area}. Current project memory:`,
+      updated.teamInfo && `Team: ${updated.teamInfo}`,
+      updated.problem && `Problem: ${updated.problem}`,
+      updated.sources && `Sources: ${updated.sources}`,
+      updated.solution && `Solution: ${updated.solution}`,
+      updated.sharedWith && `Shared With: ${updated.sharedWith}`,
+      updated.iterations && `Iterations: ${updated.iterations}`
+    ].filter(Boolean);
+
+    const context = contextParts.join('\n');
+    console.log(`[Client Tool] Returning context:`, context);
+    return context;
+  }, [rubricNotes]);
+
   const conversation = useConversation({
     agentId: AGENT_ID,
+    clientTools: {
+      updateRubricNotes: updateRubricNotes
+    },
     onConnect: () => {
       console.log("Connected");
     },
@@ -218,92 +277,224 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        {/* Bar Visualizer */}
-        <div className="max-w-4xl mx-auto mb-12">
-          <div
-            className="cursor-pointer"
-            onClick={() => {
-              if (!isConnected) {
-                startConversation();
-              }
-            }}
-            role="button"
-            tabIndex={0}
-            onKeyPress={(e) => {
-              if (e.key === "Enter" && !isConnected) {
-                startConversation();
-              }
-            }}
-          >
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#0066B3]/20">
-              <BarVisualizer
-                state={agentState}
-                barCount={20}
-                mediaStream={visualizerStream}
-                minHeight={10}
-                maxHeight={95}
-                className="w-full h-32 bg-gray-50 rounded-lg"
-                key={visualizerStream?.id || 'no-stream'}
-              />
-              <div className="mt-4 text-center">
-                <p className="text-xl font-semibold text-gray-800">
-                  {getStatusText()}
-                </p>
-                {!isConnected && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Click to start your coaching session
-                  </p>
-                )}
-                {isConnected && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      endConversation();
-                    }}
-                    className="mt-3 px-6 py-2 bg-[#ED1C24] text-white rounded-lg font-medium hover:bg-[#C41E3A] transition"
-                  >
-                    End Session
-                  </button>
-                )}
+      {/* Main Content Area - Side by Side Layout */}
+      <div className="max-w-[1800px] mx-auto px-4 py-12">
+        <div className="flex gap-6">
+          {/* LEFT: Project Notes Panel (wider, emphasized) */}
+          <div className="flex-1 max-w-[900px]">
+            <div className="bg-white rounded-2xl shadow-lg border border-[#0066B3]/20 p-8 sticky top-4">
+              <h2 className="text-2xl font-bold text-[#0066B3] mb-6 flex items-center gap-2">
+                <span>📋</span>
+                PROJECT NOTES
+              </h2>
+
+              {/* Empty State */}
+              {!rubricNotes.teamInfo && !rubricNotes.problem && !rubricNotes.sources &&
+               !rubricNotes.solution && !rubricNotes.sharedWith && !rubricNotes.iterations && (
+                <div className="text-center py-12 text-gray-500">
+                  <div className="text-6xl mb-4">🎤</div>
+                  <p className="text-lg font-medium mb-2">Start talking with your coach!</p>
+                  <p className="text-sm">As you discuss your project, the coach will remember key details here:</p>
+                  <div className="mt-4 space-y-2 text-sm text-gray-600">
+                    <p>• Team details (name, members)</p>
+                    <p>• Problem you identified</p>
+                    <p>• Research sources</p>
+                    <p>• Your solution</p>
+                    <p>• Who you shared with</p>
+                    <p>• Improvements you made</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes Sections */}
+              <div className="space-y-6">
+                {/* Team Info Section */}
+                <div className={`border-2 rounded-xl p-4 transition-all ${
+                  recentlyUpdated === 'teamInfo'
+                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
+                    : 'border-gray-200'
+                }`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <span>👥</span> Team Info
+                  </h3>
+                  {rubricNotes.teamInfo ? (
+                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.teamInfo}</p>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
+                  )}
+                </div>
+
+                {/* Problem Section */}
+                <div className={`border-2 rounded-xl p-4 transition-all ${
+                  recentlyUpdated === 'problem'
+                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
+                    : 'border-gray-200'
+                }`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <span>🎯</span> Problem
+                  </h3>
+                  {rubricNotes.problem ? (
+                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.problem}</p>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
+                  )}
+                </div>
+
+                {/* Sources Section */}
+                <div className={`border-2 rounded-xl p-4 transition-all ${
+                  recentlyUpdated === 'sources'
+                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
+                    : 'border-gray-200'
+                }`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <span>📚</span> Sources
+                  </h3>
+                  {rubricNotes.sources ? (
+                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.sources}</p>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
+                  )}
+                </div>
+
+                {/* Solution Section */}
+                <div className={`border-2 rounded-xl p-4 transition-all ${
+                  recentlyUpdated === 'solution'
+                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
+                    : 'border-gray-200'
+                }`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <span>💡</span> Solution
+                  </h3>
+                  {rubricNotes.solution ? (
+                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.solution}</p>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
+                  )}
+                </div>
+
+                {/* Shared With Section */}
+                <div className={`border-2 rounded-xl p-4 transition-all ${
+                  recentlyUpdated === 'sharedWith'
+                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
+                    : 'border-gray-200'
+                }`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <span>🤝</span> Shared With
+                  </h3>
+                  {rubricNotes.sharedWith ? (
+                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.sharedWith}</p>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
+                  )}
+                </div>
+
+                {/* Iterations Section */}
+                <div className={`border-2 rounded-xl p-4 transition-all ${
+                  recentlyUpdated === 'iterations'
+                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
+                    : 'border-gray-200'
+                }`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                    <span>🔄</span> Iterations
+                  </h3>
+                  {rubricNotes.iterations ? (
+                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.iterations}</p>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Rubric Link */}
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <a
+                  href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066B3] text-white rounded-lg font-medium hover:bg-[#0066B3]/90 transition text-sm"
+                >
+                  <span>📄</span>
+                  View Official Rubric
+                </a>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Conversation Display */}
-        {isConnected && (
-          <div className="max-w-4xl mx-auto mb-12">
-            <Conversation className="h-[500px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
-              <ConversationContent>
-                {messages.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    Start talking with your coach...
+          {/* RIGHT: Conversation Panel (narrower, minimized) */}
+          <div className="w-[400px] flex-shrink-0">
+            <div className="space-y-6 sticky top-4">
+              {/* Bar Visualizer */}
+              <div
+                className="cursor-pointer"
+                onClick={() => {
+                  if (!isConnected) {
+                    startConversation();
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter" && !isConnected) {
+                    startConversation();
+                  }
+                }}
+              >
+                <div className="bg-white rounded-2xl p-4 shadow-lg border border-[#0066B3]/20">
+                  <BarVisualizer
+                    state={agentState}
+                    barCount={15}
+                    mediaStream={visualizerStream}
+                    minHeight={10}
+                    maxHeight={80}
+                    className="w-full h-24 bg-gray-50 rounded-lg"
+                    key={visualizerStream?.id || 'no-stream'}
+                  />
+                  <div className="mt-3 text-center">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {getStatusText()}
+                    </p>
+                    {!isConnected && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Click to start
+                      </p>
+                    )}
+                    {isConnected && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          endConversation();
+                        }}
+                        className="mt-2 px-4 py-1 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-[#C41E3A] transition"
+                      >
+                        End Session
+                      </button>
+                    )}
                   </div>
-                ) : (
-                  messages.map((msg, idx) => (
-                    <Message key={idx} from={msg.from}>
-                      <MessageContent>{msg.text}</MessageContent>
-                    </Message>
-                  ))
-                )}
-              </ConversationContent>
-            </Conversation>
-          </div>
-        )}
+                </div>
+              </div>
 
-        {/* Rubric Link */}
-        <div className="text-center mt-12">
-          <a
-            href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#0066B3] text-white rounded-lg font-medium hover:bg-[#0066B3]/90 transition shadow-md"
-          >
-            <span>📋</span>
-            View Innovation Project Rubric
-          </a>
+              {/* Conversation Display */}
+              {isConnected && (
+                <div>
+                  <Conversation className="h-[600px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
+                    <ConversationContent>
+                      {messages.length === 0 ? (
+                        <div className="text-center text-gray-500 py-8 text-sm">
+                          Start talking with your coach...
+                        </div>
+                      ) : (
+                        messages.map((msg, idx) => (
+                          <Message key={idx} from={msg.from}>
+                            <MessageContent>{msg.text}</MessageContent>
+                          </Message>
+                        ))
+                      )}
+                    </ConversationContent>
+                  </Conversation>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
