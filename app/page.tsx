@@ -67,6 +67,7 @@ interface ConversationMessage {
 export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [userMediaStream, setUserMediaStream] = useState<MediaStream | null>(null);
 
   const conversation = useConversation({
     agentId: AGENT_ID,
@@ -99,7 +100,8 @@ export default function Home() {
 
   const startConversation = async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setUserMediaStream(stream);
       // @ts-expect-error - Type incompatibility with @elevenlabs/react
       await conversation.startSession();
     } catch (error: unknown) {
@@ -112,6 +114,11 @@ export default function Home() {
   const endConversation = async () => {
     try {
       await conversation.endSession();
+      // Clean up user media stream
+      if (userMediaStream) {
+        userMediaStream.getTracks().forEach(track => track.stop());
+        setUserMediaStream(null);
+      }
     } catch (error: unknown) {
       console.error("Failed to end conversation:", error);
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -135,7 +142,12 @@ export default function Home() {
 
   // Get audio stream from conversation for visualizer
   // @ts-expect-error - Type incompatibility with @elevenlabs/react
-  const audioStream = conversation.audioStream || null;
+  const agentAudioStream = conversation.audioStream || null;
+
+  // Use user's microphone stream when listening, agent's audio when speaking
+  const visualizerStream = conversation.status === "connected"
+    ? (conversation.isSpeaking ? agentAudioStream : userMediaStream)
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -191,8 +203,7 @@ export default function Home() {
                   <BarVisualizer
                     state={agentState}
                     barCount={20}
-                    mediaStream={audioStream}
-                    demo={true}
+                    mediaStream={visualizerStream}
                     minHeight={10}
                     maxHeight={95}
                     className="w-full h-48 bg-gray-100 border-2 border-[#0066B3]/20"
