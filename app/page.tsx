@@ -234,25 +234,23 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section with Background */}
+      {/* Hero Header with Background Image */}
       <div
         className="relative bg-white shadow-lg overflow-hidden"
         style={{
           backgroundImage: "url(/project-team-presenting.png)",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          minHeight: "60vh",
+          minHeight: "50vh",
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0066B3]/95 via-[#0066B3]/90 to-white/95"></div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 pt-12 pb-24">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-3">
+            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-lg">
               FIRST LEGO League Innovation Project Coach
             </h1>
-            <p className="text-lg text-white/95">
+            <p className="text-lg text-white drop-shadow-lg">
               AI-Powered Coaching for Your Innovation Project
             </p>
           </div>
@@ -262,10 +260,12 @@ export default function Home() {
               {error}
             </div>
           )}
+        </div>
 
-          {/* Interactive Coach Area - Click to Start */}
+        {/* Bar Visualizer - Positioned at bottom center of header */}
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-20">
           <div
-            className="max-w-3xl mx-auto"
+            className="cursor-pointer"
             onClick={() => {
               if (!isConnected) {
                 startConversation();
@@ -279,116 +279,78 @@ export default function Home() {
               }
             }}
           >
-            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
-              {/* BarVisualizer - Prominent and Visible */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="w-full max-w-xl">
-                  <BarVisualizer
-                    state={agentState}
-                    barCount={20}
-                    mediaStream={visualizerStream}
-                    minHeight={10}
-                    maxHeight={95}
-                    className="w-full h-48 bg-gray-100 border-2 border-[#0066B3]/20"
-                    key={visualizerStream?.id || 'no-stream'}
-                  />
-                </div>
-                <div className="mt-6 text-center">
-                  <p className="text-2xl font-semibold text-gray-800">
-                    {getStatusText()}
+            <div className="bg-white rounded-2xl p-6 shadow-2xl border-2 border-[#0066B3]/30">
+              <div className="w-[600px] max-w-[90vw]">
+                <BarVisualizer
+                  state={agentState}
+                  barCount={20}
+                  mediaStream={visualizerStream}
+                  minHeight={10}
+                  maxHeight={95}
+                  className="w-full h-32 bg-gray-50 rounded-lg"
+                  key={visualizerStream?.id || 'no-stream'}
+                />
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-xl font-semibold text-gray-800">
+                  {getStatusText()}
+                </p>
+                {!isConnected && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Click to start your coaching session
                   </p>
-                  {!isConnected && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      Click anywhere to start your coaching session
-                    </p>
-                  )}
-                  {isConnected && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        endConversation();
-                      }}
-                      className="mt-3 px-6 py-2 bg-[#ED1C24] text-white rounded-lg font-medium hover:bg-[#C41E3A] transition"
-                    >
-                      End Session
-                    </button>
-                  )}
-                </div>
+                )}
+                {isConnected && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      endConversation();
+                    }}
+                    className="mt-3 px-6 py-2 bg-[#ED1C24] text-white rounded-lg font-medium hover:bg-[#C41E3A] transition"
+                  >
+                    End Session
+                  </button>
+                )}
               </div>
             </div>
           </div>
-
-          {/* Conversation Display */}
-          {isConnected && (
-            <div className="max-w-3xl mx-auto mt-6">
-              <Conversation className="h-96 bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-[#0066B3]/20">
-                <ConversationContent>
-                  {messages.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      Start talking with your coach...
-                    </div>
-                  ) : (
-                    messages.map((msg, idx) => (
-                      <Message key={idx} from={msg.from}>
-                        <MessageContent>{msg.text}</MessageContent>
-                      </Message>
-                    ))
-                  )}
-                </ConversationContent>
-              </Conversation>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-
-        {/* Rubric Section */}
-        <div className="bg-white rounded-2xl p-8 shadow-md">
-          <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-            <h2 className="text-2xl font-semibold text-[#0066B3]">
-              Innovation Project Rubric
-            </h2>
-            <a
-              href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-[#ED1C24] text-white rounded-lg font-medium hover:bg-[#C41E3A] transition text-sm"
-            >
-              View Official Rubric PDF
-            </a>
+      {/* Main Content Area */}
+      <div className="max-w-7xl mx-auto px-4 pt-32 pb-8">
+        {/* Conversation Display */}
+        {isConnected && (
+          <div className="max-w-4xl mx-auto mb-8">
+            <Conversation className="h-[500px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
+              <ConversationContent>
+                {messages.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    Start talking with your coach...
+                  </div>
+                ) : (
+                  messages.map((msg, idx) => (
+                    <Message key={idx} from={msg.from}>
+                      <MessageContent>{msg.text}</MessageContent>
+                    </Message>
+                  ))
+                )}
+              </ConversationContent>
+            </Conversation>
           </div>
+        )}
 
-          <div className="space-y-5">
-            {rubricData.map((section, idx) => (
-              <div
-                key={idx}
-                className="border-2 border-[#0066B3] rounded-xl overflow-hidden"
-              >
-                <div className="bg-[#0066B3] text-white p-5">
-                  <h3 className="text-lg font-semibold uppercase">
-                    {section.category}
-                  </h3>
-                  <p className="text-sm opacity-95 mt-1">
-                    {section.description}
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-4 space-y-2">
-                  {section.elements.map((element, elemIdx) => (
-                    <div
-                      key={elemIdx}
-                      className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-[#0066B3] transition"
-                    >
-                      <span className="text-2xl text-[#0066B3]">☐</span>
-                      <span className="flex-1 text-sm text-gray-700">
-                        {element}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Rubric Link */}
+        <div className="text-center mt-12">
+          <a
+            href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#0066B3] text-white rounded-lg font-medium hover:bg-[#0066B3]/90 transition shadow-md"
+          >
+            <span>📋</span>
+            View Innovation Project Rubric
+          </a>
         </div>
       </div>
 
