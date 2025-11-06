@@ -210,6 +210,38 @@ export default function Home() {
             agentMediaStreamRef.current = destination.stream;
             forceUpdate({}); // Force re-render to update visualizer
             console.log('✅ Set agentMediaStream:', destination.stream);
+            console.log('  📊 Stream tracks:', destination.stream.getTracks().map(t => ({
+              kind: t.kind,
+              enabled: t.enabled,
+              muted: t.muted,
+              readyState: t.readyState,
+              label: t.label
+            })));
+            console.log('  🔊 Audio element:', {
+              volume: audio.volume,
+              muted: audio.muted,
+              paused: audio.paused,
+              readyState: audio.readyState,
+              duration: audio.duration
+            });
+
+            // Test audio levels
+            const testAnalyser = audioContextRef.current.createAnalyser();
+            source.connect(testAnalyser);
+            const dataArray = new Uint8Array(testAnalyser.frequencyBinCount);
+            const checkAudio = () => {
+              testAnalyser.getByteFrequencyData(dataArray);
+              const sum = dataArray.reduce((a, b) => a + b, 0);
+              const avg = sum / dataArray.length;
+              console.log('  🎚️ Audio level check:', avg.toFixed(2), 'active:', avg > 0);
+              if (avg > 0) {
+                console.log('  ✅ AUDIO DATA IS FLOWING!');
+              } else {
+                console.log('  ⚠️ No audio data detected');
+                setTimeout(checkAudio, 500);
+              }
+            };
+            setTimeout(checkAudio, 100);
 
             return true;
           } catch (err) {
@@ -248,8 +280,20 @@ export default function Home() {
       hasUserMediaStream: !!userMediaStream,
       selectedStream: conversation.isSpeaking ? 'agentMediaStream' : 'userMediaStream',
       visualizerStream: visualizerStream,
-      agentStreamId: agentMediaStreamRef.current?.id
+      visualizerStreamId: visualizerStream?.id,
+      agentStreamId: agentMediaStreamRef.current?.id,
+      userStreamId: userMediaStream?.id
     });
+
+    if (visualizerStream) {
+      const tracks = visualizerStream.getTracks();
+      console.log('  🎬 Visualizer stream tracks:', tracks.map(t => ({
+        kind: t.kind,
+        enabled: t.enabled,
+        muted: t.muted,
+        readyState: t.readyState
+      })));
+    }
   }, [conversation.status, conversation.isSpeaking, agentState, userMediaStream, visualizerStream]);
 
   return (
