@@ -203,25 +203,39 @@ export default function Home() {
               console.log('✅ Resumed AudioContext');
             }
 
-            // Create a media stream destination
-            const destination = audioContextRef.current.createMediaStreamDestination();
-            console.log('✅ Created MediaStreamDestination');
+            // Try to use the audio element's srcObject directly if it's a MediaStream
+            if (audio.srcObject && audio.srcObject instanceof MediaStream) {
+              console.log('✅ Audio element has MediaStream srcObject, using it directly');
+              agentMediaStreamRef.current = audio.srcObject;
+              forceUpdate({});
+              console.log('✅ Set agentMediaStream from srcObject:', audio.srcObject);
+            } else {
+              // Fallback: create from audio element
+              console.log('⚠️ Audio element does not have MediaStream srcObject, creating from element');
 
-            // Create source from audio element
-            const source = audioContextRef.current.createMediaElementSource(audio);
-            console.log('✅ Created MediaElementSource');
+              // Create a media stream destination
+              const destination = audioContextRef.current.createMediaStreamDestination();
+              console.log('✅ Created MediaStreamDestination');
 
-            // Connect to both destination (for capture) and context destination (for playback)
-            source.connect(destination);
-            source.connect(audioContextRef.current.destination);
-            console.log('✅ Connected audio nodes');
+              // Create source from audio element
+              const source = audioContextRef.current.createMediaElementSource(audio);
+              console.log('✅ Created MediaElementSource');
 
-            // Store the audio element and stream
+              // Connect to both destination (for capture) and context destination (for playback)
+              source.connect(destination);
+              source.connect(audioContextRef.current.destination);
+              console.log('✅ Connected audio nodes');
+
+              agentMediaStreamRef.current = destination.stream;
+              forceUpdate({});
+              console.log('✅ Set agentMediaStream from destination:', destination.stream);
+            }
+
+            // Store the audio element
             audioElementRef.current = audio;
-            agentMediaStreamRef.current = destination.stream;
-            forceUpdate({}); // Force re-render to update visualizer
-            console.log('✅ Set agentMediaStream:', destination.stream);
-            console.log('  📊 Stream tracks:', destination.stream.getTracks().map(t => ({
+
+            console.log('✅ Final agentMediaStream:', agentMediaStreamRef.current);
+            console.log('  📊 Stream tracks:', agentMediaStreamRef.current?.getTracks().map(t => ({
               kind: t.kind,
               enabled: t.enabled,
               muted: t.muted,
@@ -236,23 +250,28 @@ export default function Home() {
               duration: audio.duration
             });
 
-            // Test audio levels
-            const testAnalyser = audioContextRef.current.createAnalyser();
-            source.connect(testAnalyser);
-            const dataArray = new Uint8Array(testAnalyser.frequencyBinCount);
-            const checkAudio = () => {
-              testAnalyser.getByteFrequencyData(dataArray);
-              const sum = dataArray.reduce((a, b) => a + b, 0);
-              const avg = sum / dataArray.length;
-              console.log('  🎚️ Audio level check:', avg.toFixed(2), 'active:', avg > 0);
-              if (avg > 0) {
-                console.log('  ✅ AUDIO DATA IS FLOWING!');
-              } else {
-                console.log('  ⚠️ No audio data detected');
-                setTimeout(checkAudio, 500);
-              }
-            };
-            setTimeout(checkAudio, 100);
+            // Test audio levels from the final stream
+            if (agentMediaStreamRef.current) {
+              const testAnalyserContext = new AudioContext();
+              const testSource = testAnalyserContext.createMediaStreamSource(agentMediaStreamRef.current);
+              const testAnalyser = testAnalyserContext.createAnalyser();
+              testSource.connect(testAnalyser);
+              const dataArray = new Uint8Array(testAnalyser.frequencyBinCount);
+              const checkAudio = () => {
+                testAnalyser.getByteFrequencyData(dataArray);
+                const sum = dataArray.reduce((a, b) => a + b, 0);
+                const avg = sum / dataArray.length;
+                console.log('  🎚️ Audio level check:', avg.toFixed(2), 'active:', avg > 0);
+                if (avg > 0) {
+                  console.log('  ✅ AUDIO DATA IS FLOWING IN AGENT STREAM!');
+                  testAnalyserContext.close();
+                } else {
+                  console.log('  ⚠️ No audio data detected in agent stream');
+                  setTimeout(checkAudio, 500);
+                }
+              };
+              setTimeout(checkAudio, 100);
+            }
 
             return;
           } catch (err) {
