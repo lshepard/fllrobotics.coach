@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Conversation } from '@elevenlabs/client'
+import { useConversation } from '@elevenlabs/react'
 import './App.css'
 
 const AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd"
@@ -48,16 +48,33 @@ const rubricData = [
 ]
 
 function App() {
-  const [status, setStatus] = useState({ text: 'Ready to help', type: 'disconnected' })
   const [messages, setMessages] = useState([{ text: 'Click the coach to start your session...', type: 'system' }])
   const [error, setError] = useState(null)
-  const [isConnected, setIsConnected] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [volume, setVolume] = useState(100)
   const [messageInput, setMessageInput] = useState('')
+  const [volume, setVolume] = useState(100)
 
-  const conversationRef = useRef(null)
   const messagesEndRef = useRef(null)
+
+  const conversation = useConversation({
+    onConnect: () => {
+      addMessage('Connected! Your coach is ready to help.', 'system')
+    },
+    onDisconnect: () => {
+      addMessage('Session ended.', 'system')
+    },
+    onMessage: (message) => {
+      console.log('Message received:', message)
+      if (message.type === 'user_transcript') {
+        addMessage(`You: ${message.message}`, 'user')
+      } else if (message.type === 'agent_response') {
+        addMessage(`Coach: ${message.message}`, 'agent')
+      }
+    },
+    onError: (error) => {
+      console.error('Conversation error:', error)
+      showError(`Error: ${error.message || 'An error occurred'}`)
+    }
+  })
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -66,14 +83,6 @@ function App() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
-
-  useEffect(() => {
-    return () => {
-      if (conversationRef.current) {
-        conversationRef.current.endSession()
-      }
-    }
-  }, [])
 
   const addMessage = (text, type) => {
     setMessages(prev => [...prev, { text, type }])
@@ -84,103 +93,56 @@ function App() {
     setTimeout(() => setError(null), 5000)
   }
 
-  const updateStatus = (text, type) => {
-    setStatus({ text, type })
+  const getStatus = () => {
+    if (conversation.status === 'connected') {
+      return conversation.isSpeaking ? 'Coach is speaking...' : 'Coach is listening...'
+    } else if (conversation.status === 'connecting') {
+      return 'Connecting...'
+    }
+    return 'Ready to help'
+  }
+
+  const getStatusType = () => {
+    if (conversation.status === 'connected') return 'connected'
+    if (conversation.status === 'connecting') return 'connecting'
+    return 'disconnected'
   }
 
   const startConversation = async () => {
     try {
-      updateStatus('Requesting microphone access...', 'connecting')
-
       await navigator.mediaDevices.getUserMedia({ audio: true })
-
-      updateStatus('Connecting...', 'connecting')
       addMessage('Connecting to your coach...', 'system')
-
-      conversationRef.current = await Conversation.startSession({
-        agentId: AGENT_ID,
-        connectionType: 'webrtc',
-
-        onConnect: () => {
-          updateStatus('Coach is listening', 'connected')
-          addMessage('Connected! Your coach is ready to help.', 'system')
-          setIsConnected(true)
-        },
-
-        onDisconnect: () => {
-          updateStatus('Session ended', 'disconnected')
-          addMessage('Session ended.', 'system')
-          setIsConnected(false)
-          conversationRef.current = null
-        },
-
-        onMessage: (message) => {
-          console.log('Message received:', message)
-          if (message.type === 'user_transcript') {
-            addMessage(`You: ${message.message}`, 'user')
-          } else if (message.type === 'agent_response') {
-            addMessage(`Coach: ${message.message}`, 'agent')
-          }
-        },
-
-        onError: (error) => {
-          console.error('Conversation error:', error)
-          showError(`Error: ${error.message || 'An error occurred'}`)
-        },
-
-        onStatusChange: (status) => {
-          console.log('Status changed:', status)
-        },
-
-        onModeChange: (mode) => {
-          console.log('Mode changed:', mode)
-          if (mode.mode === 'speaking') {
-            updateStatus('Coach is speaking...', 'connected')
-          } else if (mode.mode === 'listening') {
-            updateStatus('Coach is listening...', 'connected')
-          }
-        }
-      })
-
+      await conversation.startSession({ agentId: AGENT_ID })
     } catch (error) {
       console.error('Failed to start conversation:', error)
       showError(`Failed to start: ${error.message}`)
-      updateStatus('Connection failed', 'disconnected')
     }
   }
 
   const endConversation = async () => {
-    if (conversationRef.current) {
-      try {
-        await conversationRef.current.endSession()
-        conversationRef.current = null
-        updateStatus('Session ended', 'disconnected')
-      } catch (error) {
-        console.error('Failed to end conversation:', error)
-        showError(`Failed to end session: ${error.message}`)
-      }
+    try {
+      await conversation.endSession()
+    } catch (error) {
+      console.error('Failed to end conversation:', error)
+      showError(`Failed to end session: ${error.message}`)
     }
   }
 
-  const toggleMute = async () => {
-    if (conversationRef.current) {
-      try {
-        const newMutedState = !isMuted
-        await conversationRef.current.setMicMuted(newMutedState)
-        setIsMuted(newMutedState)
-        addMessage(newMutedState ? 'Microphone muted' : 'Microphone unmuted', 'system')
-      } catch (error) {
-        console.error('Failed to toggle mute:', error)
-        showError(`Failed to toggle mute: ${error.message}`)
-      }
+  const toggleMute = () => {
+    try {
+      conversation.setMuted(!conversation.isMuted)
+      addMessage(conversation.isMuted ? 'Microphone muted' : 'Microphone unmuted', 'system')
+    } catch (error) {
+      console.error('Failed to toggle mute:', error)
+      showError(`Failed to toggle mute: ${error.message}`)
     }
   }
 
   const sendMessage = async () => {
     const message = messageInput.trim()
-    if (message && conversationRef.current) {
+    if (message && conversation.status === 'connected') {
       try {
-        await conversationRef.current.sendUserMessage(message)
+        await conversation.sendUserMessage(message)
         addMessage(`You: ${message}`, 'user')
         setMessageInput('')
       } catch (error) {
@@ -193,20 +155,20 @@ function App() {
   const handleVolumeChange = (value) => {
     const volumeValue = parseInt(value)
     setVolume(volumeValue)
-    if (conversationRef.current) {
-      try {
-        conversationRef.current.setVolume({ volume: volumeValue / 100 })
-      } catch (error) {
-        console.error('Failed to set volume:', error)
-      }
+    try {
+      conversation.setVolume(volumeValue / 100)
+    } catch (error) {
+      console.error('Failed to set volume:', error)
     }
   }
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && isConnected) {
+    if (e.key === 'Enter' && conversation.status === 'connected') {
       sendMessage()
     }
   }
+
+  const isConnected = conversation.status === 'connected'
 
   return (
     <div className="app">
@@ -221,12 +183,12 @@ function App() {
         {/* Agent Interface Section */}
         <div className="agent-section">
           <div
-            className={`agent-circle ${status.type}`}
+            className={`agent-circle ${getStatusType()}`}
             onClick={!isConnected ? startConversation : null}
             style={{ cursor: !isConnected ? 'pointer' : 'default' }}
           >
             <div className="agent-icon">🤖</div>
-            <div className="agent-status">{status.text}</div>
+            <div className="agent-status">{getStatus()}</div>
           </div>
 
           {error && (
@@ -251,11 +213,11 @@ function App() {
               End Session
             </button>
             <button
-              className={`btn-secondary ${isMuted ? 'muted' : ''}`}
+              className={`btn-secondary ${conversation.isMuted ? 'muted' : ''}`}
               onClick={toggleMute}
               disabled={!isConnected}
             >
-              {isMuted ? '🔇 Unmute' : '🎤 Mute'}
+              {conversation.isMuted ? '🔇 Unmute' : '🎤 Mute'}
             </button>
           </div>
 
