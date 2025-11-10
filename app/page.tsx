@@ -8,7 +8,7 @@ import {
   ConversationContent,
 } from "@/components/ui/conversation";
 import { Message, MessageContent } from "@/components/ui/message";
-import { useGeminiAssessment } from "@/hooks/useGeminiAssessment";
+import { useOpenAIAssessment } from "@/hooks/useOpenAIAssessment";
 
 const CONVERSATIONAL_AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
 
@@ -196,8 +196,8 @@ export default function Home() {
           { from: "assistant", text: message.message },
         ]);
 
-        // Send coach's response to Gemini for context
-        geminiAssessment.sendCoachMessage(message.message);
+        // Send coach's response to OpenAI for context
+        openaiAssessment.sendCoachMessage(message.message);
       }
     },
     onError: (error) => {
@@ -207,8 +207,8 @@ export default function Home() {
     },
   });
 
-  // Gemini Assessment - handles rubric scoring via audio streaming
-  const geminiAssessment = useGeminiAssessment((update) => {
+  // OpenAI Assessment - handles rubric scoring via audio streaming
+  const openaiAssessment = useOpenAIAssessment((update) => {
     console.log(`📊 Rubric update from Gemini:`, update);
 
     // Update UI state
@@ -289,9 +289,9 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
       // @ts-expect-error - startSession types are inconsistent
       await conversation.startSession();
 
-      // Start Gemini streaming assessment with same audio stream
-      console.log("🚀 Starting Gemini assessment...");
-      await geminiAssessment.start(stream);
+      // Start OpenAI streaming assessment with same audio stream
+      console.log("🚀 Starting OpenAI assessment...");
+      await openaiAssessment.start(stream);
 
       console.log("✅ Both systems started!");
     } catch (error: unknown) {
@@ -324,8 +324,8 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
 
       await conversation.endSession();
 
-      // Stop Gemini streaming
-      geminiAssessment.stop();
+      // Stop OpenAI streaming
+      openaiAssessment.stop();
 
       console.log("✅ Both systems ended");
 
