@@ -23,28 +23,35 @@ export async function GET() {
 
     // Calculate expiration times
     const expireTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
-    const newSessionExpireTime = new Date(Date.now() + 60 * 1000); // 1 minute
+    const newSessionExpireTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes (time to start session)
 
     console.log('📊 [Gemini Token] Token config:', {
       expireTime: expireTime.toISOString(),
       newSessionExpireTime: newSessionExpireTime.toISOString()
     });
 
-    // Create ephemeral token using SDK
-    const token = await client.authTokens.create({
+    // Create ephemeral token using SDK with LiveConnectConstraints
+    const tokenData = await client.authTokens.create({
       config: {
         uses: 1,
         expireTime: expireTime.toISOString(),
         newSessionExpireTime: newSessionExpireTime.toISOString(),
         httpOptions: { apiVersion: 'v1alpha' },
+        liveConnectConstraints: {
+          model: 'models/gemini-2.5-flash-live-preview',
+          config: {
+            responseModalities: ['TEXT'],
+          }
+        }
       },
     });
 
-    console.log('📊 [Gemini Token] Token created successfully');
+    console.log('📊 [Gemini Token] Token created successfully. Full response:', JSON.stringify(tokenData, null, 2));
 
     return NextResponse.json({
-      token: token.name,
-      expiresAt: token.expireTime,
+      token: tokenData.name,
+      expiresAt: tokenData.expireTime,
+      fullData: tokenData, // Include full response for debugging
     });
   } catch (error: any) {
     console.error('📊 [Gemini Token] EXCEPTION:', {

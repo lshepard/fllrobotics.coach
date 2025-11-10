@@ -46,18 +46,8 @@ export function useGeminiAssessment(
 
   // Send coach's text response to Gemini for context
   const sendCoachMessage = useCallback((message: string) => {
-    if (wsRef.current && isConnectedRef.current) {
-      wsRef.current.send(JSON.stringify({
-        client_content: {
-          turns: [{
-            role: 'model', // Marks as coach, not student
-            parts: [{ text: message }]
-          }],
-          turn_complete: true
-        }
-      }));
-      console.log('📊 Sent coach message to Gemini for context');
-    }
+    // DISABLED: Causing crashes - just use audio only for now
+    console.log('💬 📊 [DISABLED] Would send coach message:', message.substring(0, 60) + (message.length > 60 ? '...' : ''));
   }, []);
 
   const start = useCallback(async (audioStream: MediaStream) => {
@@ -74,36 +64,31 @@ export function useGeminiAssessment(
         });
         throw new Error(`Failed to get ephemeral token: ${errorData.details || errorData.error || tokenResponse.statusText}`);
       }
-      const { token } = await tokenResponse.json();
-      console.log('✅ Got ephemeral token');
+      const tokenData = await tokenResponse.json();
+      console.log('✅ Got ephemeral token response:', tokenData);
+      const token = tokenData.token;
+      console.log('✅ Using token:', token);
 
-      // Connect to Gemini Live API
-      const ws = new WebSocket(
-        `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`
-      );
+      // Connect to Gemini Live API with ephemeral token authentication
+      // Note: Must use BidiGenerateContentConstrained (not BidiGenerateContent) with ephemeral tokens
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${token}`;
+      console.log('📊 Connecting to WebSocket:', wsUrl);
+
+      const ws = new WebSocket(wsUrl);
 
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('📊 Gemini WebSocket connected');
+        console.log('✅ 📊 Gemini WebSocket connected');
 
-        // Send setup message
-        ws.send(JSON.stringify({
+        // SIMPLIFIED: Just send minimal setup - system instruction and tools only
+        const setupMessage = {
           setup: {
-            model: 'models/gemini-2.5-flash-live-preview',
-            generation_config: {
-              response_modalities: ['TEXT'], // NO AUDIO output
-              thinking_config: {
-                thinking_budget: 8192 // Higher budget for better assessment quality (0-24576)
-                // Use -1 for dynamic thinking (model decides based on complexity)
-                // Use 0 to disable thinking (faster but less accurate)
-              }
-            },
-            system_instruction: {
+            systemInstruction: {
               parts: [{ text: ASSESSMENT_PROMPT }]
             },
             tools: [{
-              function_declarations: [{
+              functionDeclarations: [{
                 name: 'updateRubricScore',
                 description: 'Update the rubric score for a specific area',
                 parameters: {
@@ -130,20 +115,65 @@ export function useGeminiAssessment(
               }]
             }]
           }
-        }));
+        };
+
+        console.log('📊 Sending simplified setup:', JSON.stringify(setupMessage, null, 2));
+        ws.send(JSON.stringify(setupMessage));
 
         isConnectedRef.current = true;
       };
 
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('📊 Gemini message:', data);
+        // Check if it's a Blob (binary data) or text
+        if (event.data instanceof Blob) {
+          console.log('📊 Received Blob data, size:', event.data.size);
+          // Handle binary data if needed
+          return;
+        }
 
-        // Handle function calls
-        if (data.toolCall) {
+        const data = JSON.parse(event.data);
+
+        // Check for errors first
+        if (data.error) {
+          console.error('❌ 📊 Gemini error:', data.error);
+          return;
+        }
+
+        // Log raw message for debugging
+        console.log('📊 Gemini raw message:', data);
+
+        // Log different message types with appropriate detail
+        if (data.setupComplete) {
+          console.log('✅ 📊 Gemini setup complete');
+        } else if (data.serverContent) {
+          // Server is sending content (transcription, thinking, etc.)
+          if (data.serverContent.modelTurn) {
+            const parts = data.serverContent.modelTurn.parts || [];
+            parts.forEach((part: any) => {
+              if (part.text) {
+                console.log('💭 📊 Gemini thinking/response:', part.text.substring(0, 100) + (part.text.length > 100 ? '...' : ''));
+              }
+              if (part.inlineData) {
+                console.log('🎤 📊 Gemini processed audio data');
+              }
+            });
+          }
+
+          // Log transcription if available
+          if (data.serverContent.turnComplete) {
+            console.log('✅ 📊 Gemini completed processing turn');
+          }
+        } else if (data.toolCall) {
+          // Handle function calls
           const functionCall = data.toolCall.functionCalls?.[0];
           if (functionCall?.name === 'updateRubricScore') {
             const args = functionCall.args;
+            console.log('🔧 📊 Gemini tool call:', {
+              area: args.area,
+              score: args.score,
+              explanation: args.explanation
+            });
+
             onRubricUpdate({
               area: args.area,
               score: args.score,
@@ -160,16 +190,37 @@ export function useGeminiAssessment(
                 }]
               }
             }));
+            console.log('✅ 📊 Sent tool response back to Gemini');
           }
+        } else {
+          // Log any other message types for debugging
+          console.log('📊 Gemini message (other):', JSON.stringify(data, null, 2));
         }
       };
 
       ws.onerror = (error) => {
-        console.error('📊 Gemini WebSocket error:', error);
+        console.error('❌ 📊 Gemini WebSocket error:', error);
       };
 
-      ws.onclose = () => {
-        console.log('📊 Gemini WebSocket closed');
+      ws.onclose = (event) => {
+        console.error('❌ 📊 Gemini WebSocket closed:', {
+          code: event.code,
+          reason: event.reason || 'No reason provided',
+          wasClean: event.wasClean,
+          type: event.type
+        });
+
+        // Common close codes:
+        // 1000 = Normal closure
+        // 1006 = Abnormal closure (no close frame)
+        // 1008 = Policy violation
+        // 1011 = Server error
+        if (event.code === 1008) {
+          console.error('❌ Policy violation - likely authentication issue');
+        } else if (event.code === 1006) {
+          console.error('❌ Abnormal closure - connection dropped unexpectedly');
+        }
+
         isConnectedRef.current = false;
       };
 
@@ -178,8 +229,19 @@ export function useGeminiAssessment(
         mimeType: 'audio/webm;codecs=opus'
       });
 
+      let audioChunkCount = 0;
+      let totalBytesSent = 0;
+
       mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0 && wsRef.current && isConnectedRef.current) {
+          audioChunkCount++;
+          totalBytesSent += event.data.size;
+
+          // Log every 5 seconds (5 chunks)
+          if (audioChunkCount % 5 === 0) {
+            console.log(`🎤 📊 Audio streaming: ${audioChunkCount} chunks, ${(totalBytesSent / 1024).toFixed(1)} KB sent`);
+          }
+
           // Convert audio blob to base64
           const reader = new FileReader();
           reader.onloadend = () => {
@@ -187,10 +249,10 @@ export function useGeminiAssessment(
 
             // Send audio chunk to Gemini
             wsRef.current?.send(JSON.stringify({
-              realtime_input: {
-                media_chunks: [{
+              realtimeInput: {
+                mediaChunks: [{
                   data: base64Audio,
-                  mime_type: 'audio/webm'
+                  mimeType: 'audio/webm'
                 }]
               }
             }));
@@ -203,7 +265,7 @@ export function useGeminiAssessment(
       mediaRecorder.start(1000);
       mediaRecorderRef.current = mediaRecorder;
 
-      console.log('📊 Started audio streaming to Gemini');
+      console.log('✅ 📊 Started audio streaming to Gemini');
 
     } catch (error) {
       console.error('Failed to start Gemini assessment:', error);
