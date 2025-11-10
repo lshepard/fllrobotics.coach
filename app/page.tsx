@@ -10,7 +10,6 @@ import {
 import { Message, MessageContent } from "@/components/ui/message";
 
 const CONVERSATIONAL_AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
-const ASSESSMENT_AGENT_ID = "agent_0101k9qe5pnzf66sfhy0wj89q73q";
 
 interface ConversationMessage {
   from: "user" | "assistant";
@@ -96,6 +95,11 @@ export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const [, forceUpdate] = useState({});
+
+  // Audio recording for Gemini assessment
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isAssessing, setIsAssessing] = useState(false);
 
   // Rubric notes state
   const [rubricNotes, setRubricNotes] = useState<RubricNotes>({
@@ -270,33 +274,7 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
     },
   });
 
-  // Assessment Agent - silently listens and updates rubric
-  const assessmentConversation = useConversation({
-    agentId: ASSESSMENT_AGENT_ID,
-    clientTools: {
-      updateRubricScoreWithExplanation: updateRubricScoreWithExplanation
-    },
-    onConnect: () => {
-      console.log("📊 Assessment agent connected (silent observer)");
-    },
-    onDisconnect: () => {
-      console.log("📊 Assessment agent disconnected");
-    },
-    onMessage: (message) => {
-      // Suppress any audio output from assessment agent
-      // Only process tool calls, ignore all audio responses
-      console.log('📊 Assessment agent message (suppressed):', message.source);
-    },
-    onError: (error) => {
-      console.error("📊 Assessment agent error:", error);
-    },
-    onAgentToolResponse: (response) => {
-      console.log('📊 Assessment agent tool response:', response);
-    },
-    onDebug: (debugInfo) => {
-      console.log('📊 Assessment agent debug:', debugInfo);
-    },
-  });
+  // TODO: Add Gemini streaming assessment here
 
   // Store reference for context updates
   useEffect(() => {
@@ -323,15 +301,15 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setUserMediaStream(stream);
 
-      // Start BOTH agents with the same audio stream
-      console.log("🚀 Starting both agents...");
+      // Start conversational agent
+      console.log("🚀 Starting conversational agent...");
 
       // @ts-expect-error - startSession types are inconsistent
       await conversation.startSession();
-      // @ts-expect-error - startSession types are inconsistent
-      await assessmentConversation.startSession();
 
-      console.log("✅ Both agents started successfully!");
+      // TODO: Start Gemini streaming assessment
+
+      console.log("✅ Conversational agent started!");
     } catch (error: unknown) {
       console.error("Failed to start conversation:", error);
 
@@ -358,15 +336,13 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
 
   const endConversation = async () => {
     try {
-      console.log("🛑 Ending both agents...");
+      console.log("🛑 Ending conversation...");
 
-      // End BOTH agents
-      await Promise.all([
-        conversation.endSession(),
-        assessmentConversation.endSession()
-      ]);
+      await conversation.endSession();
 
-      console.log("✅ Both agents ended successfully");
+      // TODO: Stop Gemini streaming
+
+      console.log("✅ Conversation ended");
 
       // Clean up user media stream
       if (userMediaStream) {
