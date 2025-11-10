@@ -8,6 +8,7 @@ import {
   ConversationContent,
 } from "@/components/ui/conversation";
 import { Message, MessageContent } from "@/components/ui/message";
+import { useGeminiAssessment } from "@/hooks/useGeminiAssessment";
 
 const CONVERSATIONAL_AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
 
@@ -96,11 +97,6 @@ export default function Home() {
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const [, forceUpdate] = useState({});
 
-  // Audio recording for Gemini assessment
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const [isAssessing, setIsAssessing] = useState(false);
-
   // Rubric notes state
   const [rubricNotes, setRubricNotes] = useState<RubricNotes>({
     teamInfo: "",
@@ -174,72 +170,6 @@ export default function Home() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const conversationalAgentRef = useRef<any>(null);
 
-  // Client tool function for updating rubric scores with explanation
-  const updateRubricScoreWithExplanation = useCallback(({
-    area,
-    score,
-    explanation
-  }: {
-    area: keyof RubricScores,
-    score: number,
-    explanation: string
-  }) => {
-    console.log(`[Client Tool] updateRubricScoreWithExplanation called:`, { area, score, explanation });
-
-    // Validate score is between 0-4
-    const validScore = Math.max(0, Math.min(4, score));
-
-    // Update scores
-    setRubricScores(prev => ({
-      ...prev,
-      [area]: validScore
-    }));
-
-    // Update explanations
-    setRubricExplanations(prev => ({
-      ...prev,
-      [area]: explanation
-    }));
-
-    // Build updated state for analysis
-    const updatedScores: RubricScores = {
-      ...rubricScores,
-      [area]: validScore
-    };
-
-    // Calculate what still needs attention
-    const unassessed = Object.entries(updatedScores)
-      .filter(([, v]) => v === 0)
-      .map(([k]) => k);
-    const weak = Object.entries(updatedScores)
-      .filter(([, v]) => v > 0 && v < 2)
-      .map(([k]) => k);
-
-    // Send contextual update to conversational agent (feedback loop)
-    if (conversationalAgentRef.current) {
-      const contextMessage = `
-[Rubric Update - Internal Context]
-Area: ${area}
-Score: ${validScore}/4
-Reasoning: ${explanation}
-
-Areas not yet discussed: ${unassessed.join(', ') || 'none'}
-Areas needing more detail (score 1): ${weak.join(', ') || 'none'}
-
-Guide the conversation naturally toward unexplored or weak areas with follow-up questions.
-      `.trim();
-
-      try {
-        conversationalAgentRef.current.sendContextualUpdate?.(contextMessage);
-        console.log(`📨 Sent context to conversational agent:`, contextMessage);
-      } catch (error) {
-        console.error('Failed to send contextual update:', error);
-      }
-    }
-
-    return `Assessed ${area}: ${validScore}/4`;
-  }, [rubricScores]);
-
   // Conversational Agent - handles dialogue with students
   const conversation = useConversation({
     agentId: CONVERSATIONAL_AGENT_ID,
@@ -265,6 +195,9 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
           ...prev,
           { from: "assistant", text: message.message },
         ]);
+
+        // Send coach's response to Gemini for context
+        geminiAssessment.sendCoachMessage(message.message);
       }
     },
     onError: (error) => {
@@ -274,7 +207,56 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
     },
   });
 
-  // TODO: Add Gemini streaming assessment here
+  // Gemini Assessment - handles rubric scoring via audio streaming
+  const geminiAssessment = useGeminiAssessment((update) => {
+    console.log(`📊 Rubric update from Gemini:`, update);
+
+    // Update UI state
+    setRubricScores(prev => ({
+      ...prev,
+      [update.area]: update.score
+    }));
+
+    setRubricExplanations(prev => ({
+      ...prev,
+      [update.area]: update.explanation
+    }));
+
+    // Calculate what still needs attention for feedback loop
+    const updatedScores = {
+      ...rubricScores,
+      [update.area]: update.score
+    };
+
+    const unassessed = Object.entries(updatedScores)
+      .filter(([, v]) => v === 0)
+      .map(([k]) => k);
+    const weak = Object.entries(updatedScores)
+      .filter(([, v]) => v > 0 && v < 2)
+      .map(([k]) => k);
+
+    // Send contextual update to conversational agent (feedback loop)
+    if (conversationalAgentRef.current) {
+      const contextMessage = `
+[Rubric Update - Internal Context]
+Area: ${update.area}
+Score: ${update.score}/4
+Reasoning: ${update.explanation}
+
+Areas not yet discussed: ${unassessed.join(', ') || 'none'}
+Areas needing more detail (score 1): ${weak.join(', ') || 'none'}
+
+Guide the conversation naturally toward unexplored or weak areas with follow-up questions.
+      `.trim();
+
+      try {
+        conversationalAgentRef.current.sendContextualUpdate?.(contextMessage);
+        console.log(`📨 Sent context to conversational agent:`, contextMessage);
+      } catch (error) {
+        console.error('Failed to send contextual update:', error);
+      }
+    }
+  });
 
   // Store reference for context updates
   useEffect(() => {
@@ -307,9 +289,11 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
       // @ts-expect-error - startSession types are inconsistent
       await conversation.startSession();
 
-      // TODO: Start Gemini streaming assessment
+      // Start Gemini streaming assessment with same audio stream
+      console.log("🚀 Starting Gemini assessment...");
+      await geminiAssessment.start(stream);
 
-      console.log("✅ Conversational agent started!");
+      console.log("✅ Both systems started!");
     } catch (error: unknown) {
       console.error("Failed to start conversation:", error);
 
@@ -340,9 +324,10 @@ Guide the conversation naturally toward unexplored or weak areas with follow-up 
 
       await conversation.endSession();
 
-      // TODO: Stop Gemini streaming
+      // Stop Gemini streaming
+      geminiAssessment.stop();
 
-      console.log("✅ Conversation ended");
+      console.log("✅ Both systems ended");
 
       // Clean up user media stream
       if (userMediaStream) {

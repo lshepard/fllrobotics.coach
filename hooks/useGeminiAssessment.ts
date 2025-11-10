@@ -4,6 +4,12 @@ const ASSESSMENT_PROMPT = `You are a SILENT observer assessing a FIRST LEGO Leag
 
 CRITICAL: You NEVER speak or generate audio responses. You ONLY call the updateRubricScore function.
 
+You will receive:
+- AUDIO STREAM: Student speaking (assess content, tone, enthusiasm, clarity)
+- TEXT with role='model': Coach's questions/responses (context only - DO NOT ASSESS)
+
+Assess ONLY the student's audio responses. Use the coach's questions to understand context.
+
 Listen to the conversation and assess the project against these 10 rubric areas:
 1. problem - Clear problem identification
 2. sources - Research sources (interviews, experts, etc.)
@@ -36,6 +42,23 @@ export function useGeminiAssessment(
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const isConnectedRef = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // Send coach's text response to Gemini for context
+  const sendCoachMessage = useCallback((message: string) => {
+    if (wsRef.current && isConnectedRef.current) {
+      wsRef.current.send(JSON.stringify({
+        client_content: {
+          turns: [{
+            role: 'model', // Marks as coach, not student
+            parts: [{ text: message }]
+          }],
+          turn_complete: true
+        }
+      }));
+      console.log('📊 Sent coach message to Gemini for context');
+    }
+  }, []);
 
   const start = useCallback(async (audioStream: MediaStream) => {
     try {
@@ -144,8 +167,37 @@ export function useGeminiAssessment(
         isConnectedRef.current = false;
       };
 
-      // Start streaming audio
-      // TODO: Implement audio capture and streaming in next step
+      // Start streaming audio to Gemini
+      const mediaRecorder = new MediaRecorder(audioStream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0 && wsRef.current && isConnectedRef.current) {
+          // Convert audio blob to base64
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Audio = (reader.result as string).split(',')[1];
+
+            // Send audio chunk to Gemini
+            wsRef.current?.send(JSON.stringify({
+              realtime_input: {
+                media_chunks: [{
+                  data: base64Audio,
+                  mime_type: 'audio/webm'
+                }]
+              }
+            }));
+          };
+          reader.readAsDataURL(event.data);
+        }
+      };
+
+      // Capture audio in 1-second chunks for streaming
+      mediaRecorder.start(1000);
+      mediaRecorderRef.current = mediaRecorder;
+
+      console.log('📊 Started audio streaming to Gemini');
 
     } catch (error) {
       console.error('Failed to start Gemini assessment:', error);
@@ -154,13 +206,26 @@ export function useGeminiAssessment(
   }, [onRubricUpdate]);
 
   const stop = useCallback(() => {
+    // Stop audio recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+
+    // Close WebSocket
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
       isConnectedRef.current = false;
-      console.log('📊 Stopped Gemini assessment');
     }
+
+    console.log('📊 Stopped Gemini assessment');
   }, []);
 
-  return { start, stop, isConnected: isConnectedRef.current };
+  return {
+    start,
+    stop,
+    sendCoachMessage,
+    isConnected: isConnectedRef.current
+  };
 }
