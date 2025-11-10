@@ -1,52 +1,65 @@
 import { NextResponse } from 'next/server';
+import { GoogleGenAI } from '@google/genai';
 
 export async function GET() {
+  console.log('📊 [Gemini Token] Endpoint called');
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
+    console.error('📊 [Gemini Token] ERROR: GEMINI_API_KEY not configured in environment variables');
     return NextResponse.json(
       { error: 'GEMINI_API_KEY not configured' },
       { status: 500 }
     );
   }
 
+  console.log('📊 [Gemini Token] API key found:', apiKey.substring(0, 10) + '...');
+
   try {
-    // Request ephemeral token from Gemini API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1alpha/cachedContents:generateEphemeralToken?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          // Token expires in 1 minute for starting new sessions
-          newSessionExpireTime: '60s',
-          // Session can last up to 30 minutes
-          expireTime: '1800s',
-        }),
-      }
-    );
+    // Create client with API key
+    const client = new GoogleGenAI({ apiKey });
+    console.log('📊 [Gemini Token] Client created');
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Failed to generate ephemeral token:', error);
-      return NextResponse.json(
-        { error: 'Failed to generate token' },
-        { status: response.status }
-      );
-    }
+    // Calculate expiration times
+    const expireTime = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+    const newSessionExpireTime = new Date(Date.now() + 60 * 1000); // 1 minute
 
-    const data = await response.json();
+    console.log('📊 [Gemini Token] Token config:', {
+      expireTime: expireTime.toISOString(),
+      newSessionExpireTime: newSessionExpireTime.toISOString()
+    });
+
+    // Create ephemeral token using SDK
+    const token = await client.authTokens.create({
+      config: {
+        uses: 1,
+        expireTime: expireTime.toISOString(),
+        newSessionExpireTime: newSessionExpireTime.toISOString(),
+        httpOptions: { apiVersion: 'v1alpha' },
+      },
+    });
+
+    console.log('📊 [Gemini Token] Token created successfully');
 
     return NextResponse.json({
-      token: data.token,
-      expiresAt: data.expireTime,
+      token: token.name,
+      expiresAt: token.expireTime,
     });
-  } catch (error) {
-    console.error('Error generating ephemeral token:', error);
+  } catch (error: any) {
+    console.error('📊 [Gemini Token] EXCEPTION:', {
+      message: error?.message,
+      status: error?.status,
+      details: error?.details,
+      stack: error?.stack,
+      fullError: JSON.stringify(error, null, 2)
+    });
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Failed to generate token',
+        details: error?.message || 'Unknown error'
+      },
       { status: 500 }
     );
   }

@@ -66,7 +66,13 @@ export function useGeminiAssessment(
       console.log('📊 Requesting Gemini ephemeral token...');
       const tokenResponse = await fetch('/api/gemini-token');
       if (!tokenResponse.ok) {
-        throw new Error('Failed to get ephemeral token');
+        const errorData = await tokenResponse.json().catch(() => ({}));
+        console.error('📊 Token request failed:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          error: errorData
+        });
+        throw new Error(`Failed to get ephemeral token: ${errorData.details || errorData.error || tokenResponse.statusText}`);
       }
       const { token } = await tokenResponse.json();
       console.log('✅ Got ephemeral token');
