@@ -472,7 +472,7 @@ export default function Home() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Voice Visualizer - first on mobile, right on desktop */}
           <div className="w-full lg:w-[400px] lg:order-3 flex-shrink-0">
-            <div className="space-y-6 sticky top-4">
+            <div className="bg-white rounded-2xl p-4 shadow-lg border border-[#0066B3]/20 sticky top-4">
               {/* Bar Visualizer */}
               <div
                 className="cursor-pointer"
@@ -489,60 +489,37 @@ export default function Home() {
                   }
                 }}
               >
-                <div className="bg-white rounded-2xl p-4 shadow-lg border border-[#0066B3]/20">
-                  <BarVisualizer
-                    state={agentState}
-                    barCount={15}
-                    mediaStream={visualizerStream}
-                    minHeight={10}
-                    maxHeight={80}
-                    className="w-full h-24 bg-gray-50 rounded-lg"
-                    key={visualizerStream?.id || 'no-stream'}
-                  />
-                  <div className="mt-3 text-center">
-                    <p className="text-sm font-semibold text-gray-800">
-                      {getStatusText()}
+                <BarVisualizer
+                  state={agentState}
+                  barCount={15}
+                  mediaStream={visualizerStream}
+                  minHeight={10}
+                  maxHeight={80}
+                  className="w-full h-24 bg-gray-50 rounded-lg"
+                  key={visualizerStream?.id || 'no-stream'}
+                />
+                <div className="mt-3 text-center">
+                  <p className="text-sm font-semibold text-gray-800">
+                    {getStatusText()}
+                  </p>
+                  {!isConnected && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Click to start
                     </p>
-                    {!isConnected && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Click to start
-                      </p>
-                    )}
-                    {isConnected && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          endConversation();
-                        }}
-                        className="mt-2 px-4 py-1 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-[#C41E3A] transition"
-                      >
-                        {messages.length > 0 ? 'Pause' : 'End Session'}
-                      </button>
-                    )}
-                  </div>
+                  )}
+                  {isConnected && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        endConversation();
+                      }}
+                      className="mt-2 px-4 py-1 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-[#C41E3A] transition"
+                    >
+                      {messages.length > 0 ? 'Pause' : 'End Session'}
+                    </button>
+                  )}
                 </div>
               </div>
-
-              {/* Conversation Display - show if connected OR if there are messages */}
-              {(isConnected || messages.length > 0) && (
-                <div>
-                  <Conversation className="h-[600px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
-                    <ConversationContent>
-                      {messages.length === 0 ? (
-                        <div className="text-center text-gray-500 py-8 text-sm">
-                          Start talking with your coach...
-                        </div>
-                      ) : (
-                        messages.map((msg, idx) => (
-                          <Message key={idx} from={msg.from}>
-                            <MessageContent>{msg.text}</MessageContent>
-                          </Message>
-                        ))
-                      )}
-                    </ConversationContent>
-                  </Conversation>
-                </div>
-              )}
             </div>
           </div>
 
@@ -702,6 +679,27 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Conversation Display at the bottom - show if connected OR if there are messages */}
+        {(isConnected || messages.length > 0) && (
+          <div className="mt-6">
+            <Conversation className="h-[400px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
+              <ConversationContent>
+                {messages.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8 text-sm">
+                    Start talking with your coach...
+                  </div>
+                ) : (
+                  messages.map((msg, idx) => (
+                    <Message key={idx} from={msg.from}>
+                      <MessageContent>{msg.text}</MessageContent>
+                    </Message>
+                  ))
+                )}
+              </ConversationContent>
+            </Conversation>
+          </div>
+        )}
       </div>
 
       <footer className="bg-gray-800 text-white text-center py-5 mt-10">
