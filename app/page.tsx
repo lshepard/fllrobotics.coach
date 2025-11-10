@@ -25,6 +25,93 @@ interface RubricNotes {
   iterations: string;
 }
 
+interface RubricScores {
+  problem: number;
+  sources: number;
+  plan: number;
+  teamwork: number;
+  innovation: number;
+  prototype: number;
+  sharing: number;
+  iteration: number;
+  communication: number;
+  pride: number;
+}
+
+interface RubricExplanations {
+  problem: string;
+  sources: string;
+  plan: string;
+  teamwork: string;
+  innovation: string;
+  prototype: string;
+  sharing: string;
+  iteration: string;
+  communication: string;
+  pride: string;
+}
+
+// RubricRow Component
+function RubricRow({ label, score, explanation }: { label: string; score: number; explanation: string }) {
+  const getBarColor = (level: number) => {
+    if (score >= level) {
+      if (score === 4) return 'bg-yellow-400'; // Exceeds - gold
+      if (score === 3) return 'bg-green-500'; // Accomplished - green
+      if (score === 2) return 'bg-blue-400'; // Developing - blue
+      return 'bg-gray-400'; // Beginning - gray
+    }
+    return 'bg-gray-200'; // Unfilled
+  };
+
+  const getLevelLabel = (level: number) => {
+    if (level === 1) return 'Beginning';
+    if (level === 2) return 'Developing';
+    if (level === 3) return 'Accomplished';
+    if (level === 4) return 'Exceeds';
+    return '';
+  };
+
+  return (
+    <div className="border-2 border-gray-200 rounded-lg p-4 hover:border-[#0066B3]/30 transition-colors">
+      {/* Label and Score */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-semibold text-gray-800">{label}</span>
+        <span className="text-sm font-medium text-gray-600">
+          {score > 0 ? `${score}/4 - ${getLevelLabel(score)}` : 'Not assessed'}
+        </span>
+      </div>
+
+      {/* Horizontal Bar Chart with 4 columns */}
+      <div className="flex gap-1 mb-3">
+        {[1, 2, 3, 4].map((level) => (
+          <div
+            key={level}
+            className={`flex-1 h-8 rounded transition-all ${getBarColor(level)} ${
+              score >= level ? 'shadow-sm' : ''
+            }`}
+            title={getLevelLabel(level)}
+          />
+        ))}
+      </div>
+
+      {/* Level Labels */}
+      <div className="flex gap-1 mb-3 text-xs text-gray-600">
+        <div className="flex-1 text-center">1</div>
+        <div className="flex-1 text-center">2</div>
+        <div className="flex-1 text-center">3</div>
+        <div className="flex-1 text-center">4</div>
+      </div>
+
+      {/* Explanation */}
+      {explanation && (
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <p className="text-sm text-gray-700 italic">{explanation}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +130,33 @@ export default function Home() {
     sharedWith: "",
     iterations: ""
   });
-  const [recentlyUpdated, setRecentlyUpdated] = useState<keyof RubricNotes | null>(null);
+
+  // Rubric scores state
+  const [rubricScores, setRubricScores] = useState<RubricScores>({
+    problem: 0,
+    sources: 0,
+    plan: 0,
+    teamwork: 0,
+    innovation: 0,
+    prototype: 0,
+    sharing: 0,
+    iteration: 0,
+    communication: 0,
+    pride: 0
+  });
+
+  const [rubricExplanations, setRubricExplanations] = useState<RubricExplanations>({
+    problem: "",
+    sources: "",
+    plan: "",
+    teamwork: "",
+    innovation: "",
+    prototype: "",
+    sharing: "",
+    iteration: "",
+    communication: "",
+    pride: ""
+  });
 
   // Client tool function for updating rubric notes
   const updateRubricNotes = useCallback(({ area, notes }: { area: keyof RubricNotes, notes: string }) => {
@@ -54,10 +167,6 @@ export default function Home() {
       ...prev,
       [area]: notes
     }));
-
-    // Trigger animation
-    setRecentlyUpdated(area);
-    setTimeout(() => setRecentlyUpdated(null), 2000);
 
     // Build updated notes object for context
     const updated: RubricNotes = {
@@ -81,15 +190,77 @@ export default function Home() {
     return context;
   }, [rubricNotes]);
 
+  // Client tool function for updating rubric scores with explanation
+  const updateRubricScoreWithExplanation = useCallback(({
+    area,
+    score,
+    explanation
+  }: {
+    area: keyof RubricScores,
+    score: number,
+    explanation: string
+  }) => {
+    console.log(`[Client Tool] updateRubricScoreWithExplanation called:`, { area, score, explanation });
+
+    // Validate score is between 0-4
+    const validScore = Math.max(0, Math.min(4, score));
+
+    // Update scores
+    setRubricScores(prev => ({
+      ...prev,
+      [area]: validScore
+    }));
+
+    // Update explanations
+    setRubricExplanations(prev => ({
+      ...prev,
+      [area]: explanation
+    }));
+
+    // Build context for agent
+    const updatedScores: RubricScores = {
+      ...rubricScores,
+      [area]: validScore
+    };
+
+    const updatedExplanations: RubricExplanations = {
+      ...rubricExplanations,
+      [area]: explanation
+    };
+
+    // Format context
+    const contextParts = [
+      `Updated ${area} score to ${validScore}/4.`,
+      `Reason: ${explanation}`,
+      `\nCurrent rubric progress:`,
+      `Problem: ${updatedScores.problem}/4 - ${updatedExplanations.problem || 'Not assessed'}`,
+      `Sources: ${updatedScores.sources}/4 - ${updatedExplanations.sources || 'Not assessed'}`,
+      `Plan: ${updatedScores.plan}/4 - ${updatedExplanations.plan || 'Not assessed'}`,
+      `Teamwork: ${updatedScores.teamwork}/4 - ${updatedExplanations.teamwork || 'Not assessed'}`,
+      `Innovation: ${updatedScores.innovation}/4 - ${updatedExplanations.innovation || 'Not assessed'}`,
+      `Prototype: ${updatedScores.prototype}/4 - ${updatedExplanations.prototype || 'Not assessed'}`,
+      `Sharing: ${updatedScores.sharing}/4 - ${updatedExplanations.sharing || 'Not assessed'}`,
+      `Iteration: ${updatedScores.iteration}/4 - ${updatedExplanations.iteration || 'Not assessed'}`,
+      `Communication: ${updatedScores.communication}/4 - ${updatedExplanations.communication || 'Not assessed'}`,
+      `Pride: ${updatedScores.pride}/4 - ${updatedExplanations.pride || 'Not assessed'}`
+    ].filter(Boolean);
+
+    const context = contextParts.join('\n');
+    console.log(`[Client Tool] Returning rubric score context:`, context);
+    return context;
+  }, [rubricScores, rubricExplanations]);
+
   const conversation = useConversation({
     agentId: AGENT_ID,
     clientTools: {
-      updateRubricNotes: updateRubricNotes
+      updateRubricNotes: updateRubricNotes,
+      updateRubricScoreWithExplanation: updateRubricScoreWithExplanation
     },
     onConnect: () => {
       console.log("Connected");
-      console.log("🔧 Client tools registered:", Object.keys({ updateRubricNotes }));
+      console.log("🔧 Client tools registered:", Object.keys({ updateRubricNotes, updateRubricScoreWithExplanation }));
       console.log("🔧 updateRubricNotes function:", typeof updateRubricNotes);
+      console.log("🔧 updateRubricScoreWithExplanation function:", typeof updateRubricScoreWithExplanation);
     },
     onDisconnect: () => {
       console.log("Disconnected");
@@ -127,14 +298,46 @@ export default function Home() {
 
   const startConversation = async () => {
     try {
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Your browser doesn't support audio access");
+      }
+
+      // Enumerate devices to check if any audio input devices exist
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(device => device.kind === 'audioinput');
+
+      console.log("Available audio input devices:", audioInputs);
+
+      if (audioInputs.length === 0) {
+        throw new Error("No microphone found. Please connect a microphone and try again.");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setUserMediaStream(stream);
       // @ts-expect-error - Type incompatibility with @elevenlabs/react
       await conversation.startSession();
     } catch (error: unknown) {
       console.error("Failed to start conversation:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      setError(`Failed to start: ${message}`);
+
+      // Provide specific error messages based on error type
+      let errorMessage = "Unknown error";
+
+      if (error instanceof Error) {
+        if (error.name === "NotFoundError") {
+          errorMessage = "No microphone found. Please connect a microphone and refresh the page.";
+        } else if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          errorMessage = "Microphone access denied. Please allow microphone access in your browser settings.";
+        } else if (error.name === "NotReadableError") {
+          errorMessage = "Microphone is already in use by another application.";
+        } else if (error.name === "OverconstrainedError") {
+          errorMessage = "No microphone meets the requirements.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      setError(`Failed to start: ${errorMessage}`);
     }
   };
 
@@ -292,128 +495,119 @@ export default function Home() {
       {/* Main Content Area - Side by Side Layout */}
       <div className="max-w-[1800px] mx-auto px-4 py-12">
         <div className="flex gap-6">
-          {/* LEFT: Project Notes Panel (wider, emphasized) */}
+          {/* LEFT: Rubric Progress Panel (wider, emphasized) */}
           <div className="flex-1 max-w-[900px]">
             <div className="bg-white rounded-2xl shadow-lg border border-[#0066B3]/20 p-8 sticky top-4">
               <h2 className="text-2xl font-bold text-[#0066B3] mb-6 flex items-center gap-2">
-                <span>📋</span>
-                PROJECT NOTES
+                <span>🏆</span>
+                INNOVATION PROJECT RUBRIC
               </h2>
 
-              {/* Empty State */}
-              {!rubricNotes.teamInfo && !rubricNotes.problem && !rubricNotes.sources &&
-               !rubricNotes.solution && !rubricNotes.sharedWith && !rubricNotes.iterations && (
-                <div className="text-center py-12 text-gray-500">
-                  <div className="text-6xl mb-4">🎤</div>
-                  <p className="text-lg font-medium mb-2">Start talking with your coach!</p>
-                  <p className="text-sm">As you discuss your project, the coach will remember key details here:</p>
-                  <div className="mt-4 space-y-2 text-sm text-gray-600">
-                    <p>• Team details (name, members)</p>
-                    <p>• Problem you identified</p>
-                    <p>• Research sources</p>
-                    <p>• Your solution</p>
-                    <p>• Who you shared with</p>
-                    <p>• Improvements you made</p>
+              {/* Rubric Groups */}
+              <div className="space-y-8">
+                {/* IDENTIFY Group */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
+                    IDENTIFY
+                  </h3>
+                  <div className="space-y-4">
+                    {/* Problem */}
+                    <RubricRow
+                      label="Problem"
+                      score={rubricScores.problem}
+                      explanation={rubricExplanations.problem}
+                    />
+                    {/* Sources */}
+                    <RubricRow
+                      label="Sources"
+                      score={rubricScores.sources}
+                      explanation={rubricExplanations.sources}
+                    />
                   </div>
                 </div>
-              )}
 
-              {/* Notes Sections */}
-              <div className="space-y-6">
-                {/* Team Info Section */}
-                <div className={`border-2 rounded-xl p-4 transition-all ${
-                  recentlyUpdated === 'teamInfo'
-                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
-                    : 'border-gray-200'
-                }`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <span>👥</span> Team Info
+                {/* DESIGN Group */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
+                    DESIGN
                   </h3>
-                  {rubricNotes.teamInfo ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.teamInfo}</p>
-                  ) : (
-                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
-                  )}
+                  <div className="space-y-4">
+                    {/* Plan */}
+                    <RubricRow
+                      label="Plan"
+                      score={rubricScores.plan}
+                      explanation={rubricExplanations.plan}
+                    />
+                    {/* Teamwork */}
+                    <RubricRow
+                      label="Teamwork"
+                      score={rubricScores.teamwork}
+                      explanation={rubricExplanations.teamwork}
+                    />
+                  </div>
                 </div>
 
-                {/* Problem Section */}
-                <div className={`border-2 rounded-xl p-4 transition-all ${
-                  recentlyUpdated === 'problem'
-                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
-                    : 'border-gray-200'
-                }`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <span>🎯</span> Problem
+                {/* CREATE Group */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
+                    CREATE
                   </h3>
-                  {rubricNotes.problem ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.problem}</p>
-                  ) : (
-                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
-                  )}
+                  <div className="space-y-4">
+                    {/* Innovation */}
+                    <RubricRow
+                      label="Innovation"
+                      score={rubricScores.innovation}
+                      explanation={rubricExplanations.innovation}
+                    />
+                    {/* Prototype */}
+                    <RubricRow
+                      label="Prototype"
+                      score={rubricScores.prototype}
+                      explanation={rubricExplanations.prototype}
+                    />
+                  </div>
                 </div>
 
-                {/* Sources Section */}
-                <div className={`border-2 rounded-xl p-4 transition-all ${
-                  recentlyUpdated === 'sources'
-                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
-                    : 'border-gray-200'
-                }`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <span>📚</span> Sources
+                {/* ITERATE Group */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
+                    ITERATE
                   </h3>
-                  {rubricNotes.sources ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.sources}</p>
-                  ) : (
-                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
-                  )}
+                  <div className="space-y-4">
+                    {/* Sharing */}
+                    <RubricRow
+                      label="Sharing"
+                      score={rubricScores.sharing}
+                      explanation={rubricExplanations.sharing}
+                    />
+                    {/* Iteration */}
+                    <RubricRow
+                      label="Iteration"
+                      score={rubricScores.iteration}
+                      explanation={rubricExplanations.iteration}
+                    />
+                  </div>
                 </div>
 
-                {/* Solution Section */}
-                <div className={`border-2 rounded-xl p-4 transition-all ${
-                  recentlyUpdated === 'solution'
-                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
-                    : 'border-gray-200'
-                }`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <span>💡</span> Solution
+                {/* COMMUNICATE Group */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
+                    COMMUNICATE
                   </h3>
-                  {rubricNotes.solution ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.solution}</p>
-                  ) : (
-                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
-                  )}
-                </div>
-
-                {/* Shared With Section */}
-                <div className={`border-2 rounded-xl p-4 transition-all ${
-                  recentlyUpdated === 'sharedWith'
-                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
-                    : 'border-gray-200'
-                }`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <span>🤝</span> Shared With
-                  </h3>
-                  {rubricNotes.sharedWith ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.sharedWith}</p>
-                  ) : (
-                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
-                  )}
-                </div>
-
-                {/* Iterations Section */}
-                <div className={`border-2 rounded-xl p-4 transition-all ${
-                  recentlyUpdated === 'iterations'
-                    ? 'border-[#0066B3] bg-[#0066B3]/5 shadow-md'
-                    : 'border-gray-200'
-                }`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                    <span>🔄</span> Iterations
-                  </h3>
-                  {rubricNotes.iterations ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">{rubricNotes.iterations}</p>
-                  ) : (
-                    <p className="text-gray-400 italic text-sm">Not yet discussed</p>
-                  )}
+                  <div className="space-y-4">
+                    {/* Communication */}
+                    <RubricRow
+                      label="Communication"
+                      score={rubricScores.communication}
+                      explanation={rubricExplanations.communication}
+                    />
+                    {/* Pride */}
+                    <RubricRow
+                      label="Pride"
+                      score={rubricScores.pride}
+                      explanation={rubricExplanations.pride}
+                    />
+                  </div>
                 </div>
               </div>
 
