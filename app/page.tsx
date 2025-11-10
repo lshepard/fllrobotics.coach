@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/conversation";
 import { Message, MessageContent } from "@/components/ui/message";
 
-const AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
+const CONVERSATIONAL_AGENT_ID = "agent_01jvcwy4xseqg8qjgw6wbgsywd";
+const ASSESSMENT_AGENT_ID = "agent_0101k9qe5pnzf66sfhy0wj89q73q";
 
 interface ConversationMessage {
   from: "user" | "assistant";
@@ -165,6 +166,10 @@ export default function Home() {
     return context;
   }, [rubricNotes]);
 
+  // Store reference to conversational agent for context updates
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const conversationalAgentRef = useRef<any>(null);
+
   // Client tool function for updating rubric scores with explanation
   const updateRubricScoreWithExplanation = useCallback(({
     area,
@@ -192,56 +197,60 @@ export default function Home() {
       [area]: explanation
     }));
 
-    // Build context for agent
+    // Build updated state for analysis
     const updatedScores: RubricScores = {
       ...rubricScores,
       [area]: validScore
     };
 
-    const updatedExplanations: RubricExplanations = {
-      ...rubricExplanations,
-      [area]: explanation
-    };
+    // Calculate what still needs attention
+    const unassessed = Object.entries(updatedScores)
+      .filter(([, v]) => v === 0)
+      .map(([k]) => k);
+    const weak = Object.entries(updatedScores)
+      .filter(([, v]) => v > 0 && v < 2)
+      .map(([k]) => k);
 
-    // Format context
-    const contextParts = [
-      `Updated ${area} score to ${validScore}/4.`,
-      `Reason: ${explanation}`,
-      `\nCurrent rubric progress:`,
-      `Problem: ${updatedScores.problem}/4 - ${updatedExplanations.problem || 'Not assessed'}`,
-      `Sources: ${updatedScores.sources}/4 - ${updatedExplanations.sources || 'Not assessed'}`,
-      `Plan: ${updatedScores.plan}/4 - ${updatedExplanations.plan || 'Not assessed'}`,
-      `Teamwork: ${updatedScores.teamwork}/4 - ${updatedExplanations.teamwork || 'Not assessed'}`,
-      `Innovation: ${updatedScores.innovation}/4 - ${updatedExplanations.innovation || 'Not assessed'}`,
-      `Prototype: ${updatedScores.prototype}/4 - ${updatedExplanations.prototype || 'Not assessed'}`,
-      `Sharing: ${updatedScores.sharing}/4 - ${updatedExplanations.sharing || 'Not assessed'}`,
-      `Iteration: ${updatedScores.iteration}/4 - ${updatedExplanations.iteration || 'Not assessed'}`,
-      `Communication: ${updatedScores.communication}/4 - ${updatedExplanations.communication || 'Not assessed'}`,
-      `Pride: ${updatedScores.pride}/4 - ${updatedExplanations.pride || 'Not assessed'}`
-    ].filter(Boolean);
+    // Send contextual update to conversational agent (feedback loop)
+    if (conversationalAgentRef.current) {
+      const contextMessage = `
+[Rubric Update - Internal Context]
+Area: ${area}
+Score: ${validScore}/4
+Reasoning: ${explanation}
 
-    const context = contextParts.join('\n');
-    console.log(`[Client Tool] Returning rubric score context:`, context);
-    return context;
-  }, [rubricScores, rubricExplanations]);
+Areas not yet discussed: ${unassessed.join(', ') || 'none'}
+Areas needing more detail (score 1): ${weak.join(', ') || 'none'}
 
+Guide the conversation naturally toward unexplored or weak areas with follow-up questions.
+      `.trim();
+
+      try {
+        conversationalAgentRef.current.sendContextualUpdate?.(contextMessage);
+        console.log(`📨 Sent context to conversational agent:`, contextMessage);
+      } catch (error) {
+        console.error('Failed to send contextual update:', error);
+      }
+    }
+
+    return `Assessed ${area}: ${validScore}/4`;
+  }, [rubricScores]);
+
+  // Conversational Agent - handles dialogue with students
   const conversation = useConversation({
-    agentId: AGENT_ID,
+    agentId: CONVERSATIONAL_AGENT_ID,
     clientTools: {
-      updateRubricNotes: updateRubricNotes,
-      updateRubricScoreWithExplanation: updateRubricScoreWithExplanation
+      // Keep rubricNotes tool if you want memory, or remove it
+      // updateRubricNotes: updateRubricNotes,
     },
     onConnect: () => {
-      console.log("Connected");
-      console.log("🔧 Client tools registered:", Object.keys({ updateRubricNotes, updateRubricScoreWithExplanation }));
-      console.log("🔧 updateRubricNotes function:", typeof updateRubricNotes);
-      console.log("🔧 updateRubricScoreWithExplanation function:", typeof updateRubricScoreWithExplanation);
+      console.log("🗣️ Conversational agent connected");
     },
     onDisconnect: () => {
-      console.log("Disconnected");
+      console.log("🗣️ Conversational agent disconnected");
     },
     onMessage: (message) => {
-      console.log("Message received:", message);
+      console.log("🗣️ Message received:", message);
       if (message.source === "user") {
         setMessages((prev) => [
           ...prev,
@@ -255,21 +264,44 @@ export default function Home() {
       }
     },
     onError: (error) => {
-      console.error("Conversation error:", error);
+      console.error("🗣️ Conversational agent error:", error);
       setError(typeof error === 'string' ? error : "An error occurred");
       setTimeout(() => setError(null), 5000);
     },
-    onUnhandledClientToolCall: (toolCall) => {
-      console.error('❌ UNHANDLED CLIENT TOOL CALL:', toolCall);
-      console.error('Tool name:', toolCall);
+  });
+
+  // Assessment Agent - silently listens and updates rubric
+  const assessmentConversation = useConversation({
+    agentId: ASSESSMENT_AGENT_ID,
+    clientTools: {
+      updateRubricScoreWithExplanation: updateRubricScoreWithExplanation
+    },
+    onConnect: () => {
+      console.log("📊 Assessment agent connected (silent observer)");
+    },
+    onDisconnect: () => {
+      console.log("📊 Assessment agent disconnected");
+    },
+    onMessage: (message) => {
+      // Suppress any audio output from assessment agent
+      // Only process tool calls, ignore all audio responses
+      console.log('📊 Assessment agent message (suppressed):', message.source);
+    },
+    onError: (error) => {
+      console.error("📊 Assessment agent error:", error);
     },
     onAgentToolResponse: (response) => {
-      console.log('✅ Agent tool response received:', response);
+      console.log('📊 Assessment agent tool response:', response);
     },
     onDebug: (debugInfo) => {
-      console.log('🐛 Debug info:', debugInfo);
+      console.log('📊 Assessment agent debug:', debugInfo);
     },
   });
+
+  // Store reference for context updates
+  useEffect(() => {
+    conversationalAgentRef.current = conversation;
+  }, [conversation]);
 
   const startConversation = async () => {
     try {
@@ -290,8 +322,16 @@ export default function Home() {
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setUserMediaStream(stream);
-      // @ts-expect-error - Type incompatibility with @elevenlabs/react
+
+      // Start BOTH agents with the same audio stream
+      console.log("🚀 Starting both agents...");
+
+      // @ts-expect-error - startSession types are inconsistent
       await conversation.startSession();
+      // @ts-expect-error - startSession types are inconsistent
+      await assessmentConversation.startSession();
+
+      console.log("✅ Both agents started successfully!");
     } catch (error: unknown) {
       console.error("Failed to start conversation:", error);
 
@@ -318,7 +358,16 @@ export default function Home() {
 
   const endConversation = async () => {
     try {
-      await conversation.endSession();
+      console.log("🛑 Ending both agents...");
+
+      // End BOTH agents
+      await Promise.all([
+        conversation.endSession(),
+        assessmentConversation.endSession()
+      ]);
+
+      console.log("✅ Both agents ended successfully");
+
       // Clean up user media stream
       if (userMediaStream) {
         userMediaStream.getTracks().forEach(track => track.stop());
