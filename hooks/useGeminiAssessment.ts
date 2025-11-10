@@ -61,11 +61,13 @@ export function useGeminiAssessment(
         // Send setup message
         ws.send(JSON.stringify({
           setup: {
-            model: 'models/gemini-2.0-flash-exp',
+            model: 'models/gemini-2.5-flash-live-preview',
             generation_config: {
               response_modalities: ['TEXT'], // NO AUDIO output
-              speech_config: {
-                voice_config: { prebuilt_voice_config: { voice_name: 'Puck' } }
+              thinking_config: {
+                thinking_budget: 8192 // Higher budget for better assessment quality (0-24576)
+                // Use -1 for dynamic thinking (model decides based on complexity)
+                // Use 0 to disable thinking (faster but less accurate)
               }
             },
             system_instruction: {
