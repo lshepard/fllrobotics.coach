@@ -51,8 +51,8 @@ interface RubricExplanations {
   pride: string;
 }
 
-// RubricRow Component
-function RubricRow({ label, score, explanation }: { label: string; score: number; explanation: string }) {
+// RubricRow Component - simplified, no text labels
+function RubricRow({ label, score }: { label: string; score: number }) {
   const getBarColor = (level: number) => {
     if (score >= level) {
       if (score === 4) return 'bg-yellow-400'; // Exceeds - gold
@@ -72,42 +72,17 @@ function RubricRow({ label, score, explanation }: { label: string; score: number
   };
 
   return (
-    <div className="border-2 border-gray-200 rounded-lg p-4 hover:border-[#0066B3]/30 transition-colors">
-      {/* Label and Score */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-semibold text-gray-800">{label}</span>
-        <span className="text-sm font-medium text-gray-600">
-          {score > 0 ? `${score}/4 - ${getLevelLabel(score)}` : 'Not assessed'}
-        </span>
-      </div>
-
-      {/* Horizontal Bar Chart with 4 columns */}
-      <div className="flex gap-1 mb-3">
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-medium text-gray-700 w-20 flex-shrink-0">{label}</span>
+      <div className="flex gap-0.5 flex-1">
         {[1, 2, 3, 4].map((level) => (
           <div
             key={level}
-            className={`flex-1 h-8 rounded transition-all ${getBarColor(level)} ${
-              score >= level ? 'shadow-sm' : ''
-            }`}
+            className={`flex-1 h-3 rounded-sm transition-all ${getBarColor(level)}`}
             title={getLevelLabel(level)}
           />
         ))}
       </div>
-
-      {/* Level Labels */}
-      <div className="flex gap-1 mb-3 text-xs text-gray-600">
-        <div className="flex-1 text-center">1</div>
-        <div className="flex-1 text-center">2</div>
-        <div className="flex-1 text-center">3</div>
-        <div className="flex-1 text-center">4</div>
-      </div>
-
-      {/* Explanation */}
-      {explanation && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <p className="text-sm text-gray-700 italic">{explanation}</p>
-        </div>
-      )}
     </div>
   );
 }
@@ -492,142 +467,11 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Main Content Area - Side by Side Layout */}
+      {/* Main Content Area - Responsive Layout */}
       <div className="max-w-[1800px] mx-auto px-4 py-12">
-        <div className="flex gap-6">
-          {/* LEFT: Rubric Progress Panel (wider, emphasized) */}
-          <div className="flex-1 max-w-[900px]">
-            <div className="bg-white rounded-2xl shadow-lg border border-[#0066B3]/20 p-8 sticky top-4">
-              <h2 className="text-2xl font-bold text-[#0066B3] mb-6 flex items-center gap-2">
-                <span>🏆</span>
-                INNOVATION PROJECT RUBRIC
-              </h2>
-
-              {/* Rubric Groups */}
-              <div className="space-y-8">
-                {/* IDENTIFY Group */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
-                    IDENTIFY
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Problem */}
-                    <RubricRow
-                      label="Problem"
-                      score={rubricScores.problem}
-                      explanation={rubricExplanations.problem}
-                    />
-                    {/* Sources */}
-                    <RubricRow
-                      label="Sources"
-                      score={rubricScores.sources}
-                      explanation={rubricExplanations.sources}
-                    />
-                  </div>
-                </div>
-
-                {/* DESIGN Group */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
-                    DESIGN
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Plan */}
-                    <RubricRow
-                      label="Plan"
-                      score={rubricScores.plan}
-                      explanation={rubricExplanations.plan}
-                    />
-                    {/* Teamwork */}
-                    <RubricRow
-                      label="Teamwork"
-                      score={rubricScores.teamwork}
-                      explanation={rubricExplanations.teamwork}
-                    />
-                  </div>
-                </div>
-
-                {/* CREATE Group */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
-                    CREATE
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Innovation */}
-                    <RubricRow
-                      label="Innovation"
-                      score={rubricScores.innovation}
-                      explanation={rubricExplanations.innovation}
-                    />
-                    {/* Prototype */}
-                    <RubricRow
-                      label="Prototype"
-                      score={rubricScores.prototype}
-                      explanation={rubricExplanations.prototype}
-                    />
-                  </div>
-                </div>
-
-                {/* ITERATE Group */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
-                    ITERATE
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Sharing */}
-                    <RubricRow
-                      label="Sharing"
-                      score={rubricScores.sharing}
-                      explanation={rubricExplanations.sharing}
-                    />
-                    {/* Iteration */}
-                    <RubricRow
-                      label="Iteration"
-                      score={rubricScores.iteration}
-                      explanation={rubricExplanations.iteration}
-                    />
-                  </div>
-                </div>
-
-                {/* COMMUNICATE Group */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 uppercase tracking-wide">
-                    COMMUNICATE
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Communication */}
-                    <RubricRow
-                      label="Communication"
-                      score={rubricScores.communication}
-                      explanation={rubricExplanations.communication}
-                    />
-                    {/* Pride */}
-                    <RubricRow
-                      label="Pride"
-                      score={rubricScores.pride}
-                      explanation={rubricExplanations.pride}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Rubric Link */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <a
-                  href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#0066B3] text-white rounded-lg font-medium hover:bg-[#0066B3]/90 transition text-sm"
-                >
-                  <span>📄</span>
-                  View Official Rubric
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT: Conversation Panel (narrower, minimized) */}
-          <div className="w-[400px] flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Voice Visualizer - first on mobile, right on desktop */}
+          <div className="w-full lg:w-[400px] lg:order-3 flex-shrink-0">
             <div className="space-y-6 sticky top-4">
               {/* Bar Visualizer */}
               <div
@@ -672,15 +516,15 @@ export default function Home() {
                         }}
                         className="mt-2 px-4 py-1 bg-[#ED1C24] text-white rounded-lg text-sm font-medium hover:bg-[#C41E3A] transition"
                       >
-                        End Session
+                        {messages.length > 0 ? 'Pause' : 'End Session'}
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Conversation Display */}
-              {isConnected && (
+              {/* Conversation Display - show if connected OR if there are messages */}
+              {(isConnected || messages.length > 0) && (
                 <div>
                   <Conversation className="h-[600px] bg-white rounded-2xl shadow-lg border border-[#0066B3]/20">
                     <ConversationContent>
@@ -699,6 +543,162 @@ export default function Home() {
                   </Conversation>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* LEFT on desktop, second on mobile: Rubric Progress Panel (narrower) */}
+          <div className="w-full lg:w-[400px] lg:order-1 flex-shrink-0">
+            <div className="bg-white rounded-2xl shadow-lg border border-[#0066B3]/20 p-4 sticky top-4">
+              <h2 className="text-lg font-bold text-[#0066B3] mb-3 flex items-center gap-2">
+                <span>🏆</span>
+                RUBRIC
+              </h2>
+
+              {/* Rubric Groups */}
+              <div className="space-y-3">
+                {/* IDENTIFY Group */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wide">
+                    IDENTIFY
+                  </h3>
+                  <div className="space-y-1.5">
+                    {/* Problem */}
+                    <RubricRow
+                      label="Problem"
+                      score={rubricScores.problem}
+                    />
+                    {/* Sources */}
+                    <RubricRow
+                      label="Sources"
+                      score={rubricScores.sources}
+                    />
+                  </div>
+                </div>
+
+                {/* DESIGN Group */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wide">
+                    DESIGN
+                  </h3>
+                  <div className="space-y-1.5">
+                    {/* Plan */}
+                    <RubricRow
+                      label="Plan"
+                      score={rubricScores.plan}
+                    />
+                    {/* Teamwork */}
+                    <RubricRow
+                      label="Teamwork"
+                      score={rubricScores.teamwork}
+                    />
+                  </div>
+                </div>
+
+                {/* CREATE Group */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wide">
+                    CREATE
+                  </h3>
+                  <div className="space-y-1.5">
+                    {/* Innovation */}
+                    <RubricRow
+                      label="Innovation"
+                      score={rubricScores.innovation}
+                    />
+                    {/* Prototype */}
+                    <RubricRow
+                      label="Prototype"
+                      score={rubricScores.prototype}
+                    />
+                  </div>
+                </div>
+
+                {/* ITERATE Group */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wide">
+                    ITERATE
+                  </h3>
+                  <div className="space-y-1.5">
+                    {/* Sharing */}
+                    <RubricRow
+                      label="Sharing"
+                      score={rubricScores.sharing}
+                    />
+                    {/* Iteration */}
+                    <RubricRow
+                      label="Iteration"
+                      score={rubricScores.iteration}
+                    />
+                  </div>
+                </div>
+
+                {/* COMMUNICATE Group */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-800 mb-1.5 uppercase tracking-wide">
+                    COMMUNICATE
+                  </h3>
+                  <div className="space-y-1.5">
+                    {/* Communication */}
+                    <RubricRow
+                      label="Communication"
+                      score={rubricScores.communication}
+                    />
+                    {/* Pride */}
+                    <RubricRow
+                      label="Pride"
+                      score={rubricScores.pride}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rubric Link */}
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <a
+                  href="https://firstinspires.blob.core.windows.net/fll/challenge/2025-26/fll-challenge-unearthed-rubrics-color.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-[#0066B3] text-white rounded text-[10px] font-medium hover:bg-[#0066B3]/90 transition"
+                >
+                  <span>📄</span>
+                  Official Rubric
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* MIDDLE on desktop, third on mobile: Commentary Panel (wider) */}
+          <div className="flex-1 lg:order-2">
+            <div className="bg-white rounded-2xl shadow-lg border border-[#0066B3]/20 p-4 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <h2 className="text-lg font-bold text-[#0066B3] mb-3">
+                AI Coach Feedback
+              </h2>
+
+              <div className="space-y-3">
+                {/* Show explanations for each rubric area */}
+                {Object.entries(rubricExplanations).map(([key, explanation]) => {
+                  const score = rubricScores[key as keyof RubricScores];
+                  if (!explanation) return null;
+
+                  return (
+                    <div key={key} className="border-l-4 border-[#0066B3] pl-3 py-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-gray-800 capitalize">{key}</span>
+                        <span className="text-xs text-gray-500">({score}/4)</span>
+                      </div>
+                      <p className="text-sm text-gray-700">{explanation}</p>
+                    </div>
+                  );
+                })}
+
+                {/* Empty state */}
+                {Object.values(rubricExplanations).every(exp => !exp) && (
+                  <div className="text-center py-12 text-gray-400">
+                    <div className="text-4xl mb-2">💬</div>
+                    <p className="text-sm">AI coach feedback will appear here as you discuss your project</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
